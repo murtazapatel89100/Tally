@@ -1,0 +1,15 @@
+[package]
+name = "tally-core"
+version = "0.1.0"
+edition = "2024"
+description = "Pure domain logic for Tally — no TUI dependencies"
+
+[dependencies]
+rust_decimal = "1"
+rust_decimal_macros = "1"
+jiff = "0.2"
+indexmap = "2"
+thiserror = "2"
+
+[lints]
+workspace = true
