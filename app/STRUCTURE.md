@@ -1,8 +1,13 @@
-# App — Structure Guide
+# App — Structure Guide (Phase 2: the parser)
 
 This is for someone coming from Python, Go, or TypeScript who wants to understand
-how a Rust project is laid out and why — including what actually breaks when you
-change things.
+how this Rust project is laid out and why — including what actually breaks when
+you change things.
+
+Phase 2 is where Tally grew its **parser**: the code that turns a plain-text
+journal file into typed data. This guide centers on that subsystem — the three
+new modules (`error.rs`, `parser.rs`, `journal.rs`) and how a line of text
+becomes a `Transaction`.
 
 ---
 
@@ -31,6 +36,10 @@ This project has **one workspace** (`app/Cargo.toml`) containing **two crates**:
 - `core/` — a library crate (no `main`, can't be run directly)
 - `tally/` — a binary crate (has `main.rs`, produces the `tally` executable)
 
+The parser lives entirely in `core/`, so it has **zero terminal/UI
+dependencies** — it can be unit-tested without a terminal and could later be
+compiled to WASM for a web app.
+
 ### How do crates link to each other?
 
 You declare a dependency in `Cargo.toml`, exactly like `package.json`'s
@@ -45,7 +54,7 @@ tally-core = { path = "../core" }
 Then in Rust code you bring it in with:
 
 ```rust
-use tally_core::model::Transaction;
+use tally_core::journal::Journal;
 //   ^^^^^^^^^^ crate name (hyphens become underscores in code)
 ```
 
@@ -55,16 +64,16 @@ use tally_core::model::Transaction;
 ### What is `mod`?
 
 Inside a crate, code is split into **modules** — Rust's equivalent of files/
-subpackages. A module is declared with `mod model;` which tells Rust to look for
-either `model.rs` or `model/mod.rs`.
+subpackages. A module is declared with `mod parser;` which tells Rust to look for
+either `parser.rs` or `parser/mod.rs`.
 
 ```
 src/
-├── lib.rs          ← crate root; declares: pub mod model;
-└── model.rs        ← the actual module code
+├── lib.rs           ← crate root; declares: pub mod parser;
+└── parser.rs        ← the actual module code
 ```
 
-This is like Python's `from . import model` or Go's implicit package discovery.
+This is like Python's `from . import parser` or Go's implicit package discovery.
 
 ---
 
@@ -79,249 +88,246 @@ app/                        ← workspace root
 │   └── sample.journal      ← test data file (not a Rust file)
 ├── core/                   ← "tally-core" library crate
 │   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs          ← crate root
-│       └── model.rs        ← data types
+│   ├── src/
+│   │   ├── lib.rs          ← crate root
+│   │   ├── model.rs        ← data types (what the parser produces)
+│   │   ├── error.rs        ← friendly parse diagnostics (miette)   ← Phase 2
+│   │   ├── parser.rs       ← journal text → model (winnow)         ← Phase 2
+│   │   └── journal.rs      ← assembles entries into a Journal      ← Phase 2
+│   └── tests/
+│       └── sample_journal.rs  ← end-to-end test against the fixture ← Phase 2
 └── tally/                  ← "tally" binary crate
     ├── Cargo.toml
     └── src/
-        └── main.rs         ← entry point (like main.go or index.ts)
+        └── main.rs         ← entry point (CLI arrives in Phase 3)
 ```
 
-### Why split into two crates at all?
+---
 
-The `core/` library has **zero terminal/UI dependencies**. This means:
-- It can be unit tested without spinning up a terminal.
-- It could be compiled to WASM and reused in a future web app.
-- The TUI code in `tally/` stays cleanly separated from business logic.
+## The parsing pipeline
 
-This is the same reason you'd separate a Go service into a `pkg/` library and a
-`cmd/` binary, or a Python project into a library and a CLI entrypoint.
+Everything Phase 2 added is one pipeline: **text in, typed `Journal` out.**
+
+```
+ "2026-01-05 * Grocery\n    Expenses:Food  $12\n    Assets:Checking\n"
+        │
+        ▼  parser::parse(text, name)          ← parser.rs
+   Vec<Entry>        (Entry = Transaction | Directive, amounts inferred)
+        │
+        ▼  Journal::build(entries)            ← journal.rs
+   Journal { transactions, accounts, commodities, aliases, warnings }
+
+   …and on any syntax error, a ParseError that draws a caret ← error.rs
+```
+
+Two layers, deliberately separated:
+
+- **`parser.rs`** answers *"what does this text say?"* — pure syntax. It produces
+  a flat list of `Entry` values and knows nothing about aliases or files.
+- **`journal.rs`** answers *"what does it mean together?"* — it folds those
+  entries into a `Journal`, resolving `alias` rewrites, expanding `include`
+  files, and building the account/commodity indexes.
+
+Keeping them apart means the tricky, whitespace-sensitive tokenizing is testable
+in isolation, and the semantic assembly (which touches the filesystem for
+`include`) stays out of the hot parsing path.
 
 ---
 
 ## File-by-file breakdown
 
-### `app/Cargo.toml` — workspace manifest
+### Dependencies added in Phase 2
+
+Two crates were added to `core/Cargo.toml`:
 
 ```toml
-[workspace]
-members = ["core", "tally"]   # which folders are crates
-resolver = "2"                # dependency resolution strategy (always use 2)
+winnow = "1"    # parser-combinator library — powers amount/date parsing
+miette = { version = "7", features = ["fancy"] }  # rich, caret-drawing diagnostics
 ```
 
-Also contains shared lint rules that apply to every crate in the workspace —
-saves repeating them in each `Cargo.toml`.
+- **winnow** is a *parser-combinator* library: you build big parsers by composing
+  tiny ones (`sign`, `number`, `commodity`) instead of writing a state machine by
+  hand. It's used for "the heart" — parsing amounts and dates.
+- **miette** turns an error type into a graphical diagnostic (file, line/column,
+  and a caret underlining the bad token). The `fancy` feature enables the
+  box-drawing renderer.
 
 **Behavioral examples:**
 
-- Add `"cli"` to `members` → Cargo now builds a third crate at `app/cli/`. It
-  won't compile until `app/cli/Cargo.toml` and `app/cli/src/` exist.
-- Remove `"tally"` from `members` → `cargo build` no longer builds the binary.
-  The library still compiles fine. `cargo run -p tally` errors with "package not
-  found".
-- Add `pedantic = "warn"` under `[workspace.lints.clippy]` → every crate in the
-  workspace suddenly gets ~150 extra clippy warnings. Useful to tighten quality,
-  but expect noise on first run.
-
----
-
-### `app/Cargo.lock`
-
-Auto-generated by Cargo. Pins every dependency to an exact version so builds
-are reproducible. **Commit this file** for applications (same reason you commit
-`package-lock.json`). For pure libraries you'd gitignore it.
-
-**Behavioral examples:**
-
-- Delete `Cargo.lock` and run `cargo build` → Cargo re-resolves all dependencies
-  to their latest compatible versions and regenerates the file. Usually fine, but
-  occasionally a dependency releases a breaking patch and the build breaks.
-- Edit a version in `Cargo.lock` by hand → Cargo overwrites your change on the
-  next build. Never edit it manually.
-
----
-
-### `app/rustfmt.toml`
-
-Config for `cargo fmt` (Rust's built-in formatter, like `gofmt` or `prettier`).
-Notable settings:
-- `max_width = 100` — line length limit
-- `imports_granularity = "Crate"` — groups imports by crate, then sorts them
-
-**Behavioral examples:**
-
-- Change `max_width` to `80` and run `cargo fmt` → long function signatures and
-  chained method calls get broken onto multiple lines throughout the codebase.
-- Delete `rustfmt.toml` entirely → `cargo fmt` falls back to Rust defaults
-  (88-char width, per-item import grouping). The diff will be noisy but the code
-  still compiles.
-
----
-
-### `app/core/Cargo.toml` — tally-core library
-
-```toml
-[package]
-name = "tally-core"   # crate name (use hyphens)
-edition = "2024"      # Rust language edition (like ES2022 in JS)
-
-[dependencies]
-rust_decimal = "1"    # exact decimal arithmetic for money
-jiff = "0.2"          # date/time library
-indexmap = "2"        # ordered hash map
-thiserror = "2"       # ergonomic error types for libraries
-```
-
-**Behavioral examples:**
-
-- Remove `rust_decimal` → `cargo build` fails immediately with "use of undeclared
-  crate `rust_decimal`" on the first line of `model.rs` that imports it. Every
-  type using `Decimal` stops compiling.
-- Change `jiff = "0.2"` to `jiff = "0.1"` → Cargo tries to resolve 0.1 and may
-  find a version whose API differs. If `civil::Date` was renamed or moved, you
-  get compile errors in `model.rs`. The lock file pins you against surprises day-
-  to-day, but an explicit version bump like this re-resolves.
-- Add a new dependency, e.g. `serde = { version = "1", features = ["derive"] }`
-  → available in `core/` immediately. You still have to `use serde::Serialize;`
-  in your source files to actually use it.
+- Remove `winnow` → every `use winnow::...` line in `parser.rs` fails to compile
+  with "use of undeclared crate `winnow`".
+- Drop the `fancy` feature from miette → the code still compiles, but printed
+  errors lose the colored box-and-caret rendering and fall back to plain text.
 
 ---
 
 ### `app/core/src/lib.rs` — library crate root
 
-The entry point for a library crate (equivalent to `index.ts` or `__init__.py`).
-Declares which modules are public:
+Declares the crate's public modules:
 
 ```rust
-pub mod model;   // makes model.rs accessible to users of this crate
+pub mod model;    // data types
+pub mod error;    // parse diagnostics
+pub mod parser;   // journal text → model
+pub mod journal;  // model → assembled Journal
 ```
 
-**Behavioral examples:**
-
-- Change `pub mod model` to `mod model` (remove `pub`) → `model` becomes private
-  to the `tally-core` crate. The `tally` binary can no longer do
-  `use tally_core::model::Transaction` and `cargo build` fails with "module
-  `model` is private".
-- Add `pub mod parser;` without creating `parser.rs` → compile error: "file not
-  found for module `parser`". Rust expects the file to exist the moment you
-  declare the module.
-- Add `pub mod parser;` and create `core/src/parser.rs` → the new module is
-  immediately part of the public API and accessible as `tally_core::parser::…`
-  from the binary.
-
----
-
-### `app/core/src/model.rs` — the data model
-
-All the core data types. In Python you'd call these dataclasses; in Go, structs;
-in TypeScript, interfaces + classes.
-
-| Type | Analogy | What it represents |
-|------|---------|-------------------|
-| `CommodityPosition` | enum | Is the symbol before (`$45`) or after (`45 USD`) the number? |
-| `Commodity` | struct | A currency/asset symbol, e.g. `$` or `USD` |
-| `Amount` | struct | A number + a commodity. `45.00 $`. Never uses `f64` — exact decimal only. |
-| `Account` | struct | A colon-separated account path like `Assets:Checking`. Stored as `Vec<String>`. |
-| `Status` | enum | `Uncleared` / `Pending !` / `Cleared *` — whether a transaction has settled. |
-| `Posting` | struct | One line of a transaction (debit or credit). Has an account + optional amount. |
-| `SourceSpan` | struct | Start/end byte positions in the journal file. The parser fills this in (Phase 2). |
-| `Transaction` | struct | A complete journal entry: date, payee, status, and a list of `Posting`s. |
-
-`Amount` implements `+` and unary `-` as Rust operator overloads (like Python's
-`__add__`/`__neg__`). Adding two amounts with different currencies returns
-`None` instead of silently producing garbage.
-
-`Transaction::is_balanced()` enforces the double-entry rule: all postings must
-sum to zero, or exactly one posting may have no amount (it gets inferred).
+It also carries a crate-level `#![allow(clippy::result_large_err)]`: `ParseError`
+deliberately embeds the whole source file (so it can draw a caret), which makes
+it larger than clippy's `result_large_err` threshold. Boxing every `Result` on
+the rare error path would only hurt readability, so we opt out of that lint here.
 
 **Behavioral examples:**
 
-- Add a field to `Transaction`, e.g. `pub note: Option<String>` → compiles fine.
-  Any code that constructs a `Transaction` using `..` struct update syntax still
-  works. Code using `Transaction { date, payee, .. }` pattern matching still
-  works. The field defaults to `None` when you call `Transaction::new()` since
-  that's what the constructor sets. No other file breaks.
-
-- Remove a field from `Transaction`, e.g. delete `pub code: Option<String>` →
-  anything in the codebase that reads `.code` or sets `code:` in a struct literal
-  gets a compile error. Rust surfaces every usage site immediately — nothing
-  silently disappears at runtime like it might in Python or JS.
-
-- Change `pub amount: Option<Amount>` on `Posting` to `pub amount: Amount`
-  (make it required) → `is_balanced()` breaks because it checks
-  `p.amount.is_none()`. The tests that construct a posting with `None` as the
-  amount also break. Every place that assumes the amount can be absent must be
-  updated. The compiler lists every single one.
-
-- Add a variant to the `Status` enum, e.g. `Disputed` → the `marker()` match
-  block gets a compiler warning ("non-exhaustive patterns") until you add a
-  `Self::Disputed => Some('?')` arm. Rust forces you to handle every variant —
-  unlike a string enum in TypeScript where a new value would silently fall
-  through a switch.
-
-- Change `checked_add` to return `Amount` and panic on mismatch (instead of
-  `Option<Amount>`) → the `Add` impl simplifies but callers can no longer
-  gracefully handle mismatched currencies. The test
-  `amount_checked_add_different_commodities_returns_none` would need to be
-  rewritten as a `#[should_panic]` test.
+- Add `pub mod query;` without creating `query.rs` → compile error: "file not
+  found for module `query`". Rust expects the file to exist the moment you declare
+  the module.
+- Remove the `#![allow(...)]` line → `cargo clippy` starts warning that the
+  `Err` variant of `parse`'s return type is "very large". Harmless, but noisy.
 
 ---
 
-### `app/tally/Cargo.toml` — tally binary
+### `app/core/src/model.rs` — the types the parser fills in
 
-```toml
-[[bin]]             # double brackets = array of tables in TOML
-name = "tally"
-path = "src/main.rs"
+The parser doesn't invent its own output shapes; it populates the data types that
+already existed: `Transaction`, `Posting`, `Amount`, `Commodity`, `Account`,
+`Status`, and `SourceSpan`. The one field Phase 2 finally puts to use is
+`Transaction.source_span` — the byte range the transaction occupied in the file,
+which the parser records so later phases (edit/write-back) can find it again.
 
-[dependencies]
-tally-core = { path = "../core" }   # local path dependency
+`Transaction::is_balanced()` remains the double-entry check the parser relies on:
+after inference runs, a well-formed transaction sums to zero per commodity.
+
+**Behavioral examples:**
+
+- Make `Posting.amount` required (`Amount` instead of `Option<Amount>`) → amount
+  inference in `parser.rs` breaks, because it represents a blank posting as
+  `amount: None`. The compiler flags every site that assumed it could be absent.
+- Add a `Status` variant (e.g. `Disputed`) → the `marker()` match and the header
+  parser's `*`/`!` handling both need updating; the compiler lists each spot.
+
+---
+
+### `app/core/src/error.rs` — parse diagnostics
+
+Defines `ParseError`, which derives both `thiserror::Error` (so it's a normal
+Rust error) and `miette::Diagnostic` (so a reporter can draw a caret). It bundles
+the failure message, the full source text, a byte-offset span, the caret label,
+and an optional help hint. Printed by a miette-aware reporter, a bad amount looks
+like:
+
+```
+  × invalid amount
+   ╭─[sample.journal:2:22]
+ 2 │     Expenses:Food    $1..2
+   ·                      ──┬──
+   ·                        ╰── not a valid amount
+   ╰────
+  help: Amounts look like `$1,234.56`, `-$3`, or `10 AAPL`.
 ```
 
+The `#[source_code]`, `#[label]`, and `#[help]` attributes are how the derive
+macro learns which field is the text, which is the span, and which is the hint.
+
 **Behavioral examples:**
 
-- Add `clap = { version = "4", features = ["derive"] }` to `[dependencies]` →
-  `clap` is now available inside `tally/src/` only, not in `core/`. This is
-  intentional — the CLI argument parser belongs in the binary, not the library.
-- Change `path = "src/main.rs"` to `path = "src/bin/tally.rs"` → Cargo looks for
-  the entry point at the new path. The old `src/main.rs` is ignored. Move the
-  file or the build breaks.
+- Change `#[label("{}", self.label)]` to a fixed `#[label("here")]` → every error
+  shows `here` under the caret instead of the specific message the parser chose.
+  Still compiles.
+- Remove the `#[source_code]` field → the derive still compiles, but the reporter
+  has no text to render, so you get the headline with no caret or code frame.
 
 ---
 
-### `app/tally/src/main.rs` — binary entry point
+### `app/core/src/parser.rs` — the journal parser *(the heart)*
 
-The `main()` function — same as `main.go` or the top-level `index.ts` script.
-Currently a placeholder. Phase 3 adds `clap` subcommands here (`bal`, `reg`, etc.).
+Turns journal text into a `Vec<Entry>` (each `Entry` is a `Transaction` or a
+`Directive`). It works in two registers:
+
+1. **Line-oriented outer loop** (plain Rust). Ledger's grammar is defined by
+   *lines* and *indentation*, so the loop walks the file a line at a time and
+   classifies each one: blank, comment (`;` `#` `%` `|` `*`), a directive, a
+   transaction header (starts with a digit), or an indented posting.
+2. **winnow token parsers** for the fiddly bits inside a line — dates and,
+   above all, **amounts**. Small combinators (`sign`, `number`, `commodity`) are
+   composed into `prefixed_amount` / `suffixed_amount`.
+
+Public helpers `parse`, `parse_date`, and `parse_amount` are unit-tested directly.
+
+Key rules it implements (all from the PRD's file-format section):
+
+- **Account/amount split:** the account name ends at the first run of *2+ spaces*
+  or a tab; everything after is the amount. That's why `Equity:Opening Balances`
+  (a single space) stays one name.
+- **Amount inference:** if exactly one posting in a transaction has no amount,
+  it's filled in so the postings sum to zero (single-commodity case).
+- **Amounts:** prefixed (`$45`, `-$3`, `$-3`), suffixed (`10 AAPL`), thousands
+  separators (`$1,234.56`), and negatives in either position.
+- **Tags:** `; key: value` and `; :flag1:flag2:` comment forms become structured
+  tags on the transaction or posting; anything else stays a plain comment.
+- **Diagnostics:** every error carries precise byte offsets. The parser computes
+  them with a pointer trick (`offset_in`): because each token is a *subslice* of
+  the original text, subtracting pointers gives its exact position for the caret.
 
 **Behavioral examples:**
 
-- Add `use tally_core::model::Transaction;` at the top → it compiles because
-  `tally-core` is already a declared dependency. You now have access to every
-  public type in `model.rs`.
-- Delete `fn main()` → compile error: "the `main` function is not defined in the
-  root module". A binary crate must have exactly one `main`.
+- Change `find_amount_sep` to split on a *single* space → `Equity:Opening
+  Balances` now parses as account `Equity:Opening` with amount `Balances`, which
+  fails amount parsing. The `keeps_single_space_account_names` test catches it.
+- Add a variant to the `Directive` enum (e.g. `Year(i16)`) → `journal.rs`'s
+  `apply_directive` match stops compiling until you handle the new case. The
+  compiler points at the exact spot.
+- Feed a file whose first line is indented → `parse` returns a `ParseError`
+  ("posting outside of a transaction") instead of panicking.
+- Widen `commodity` to also accept digits → `10 AAPL` would tokenize wrong,
+  because the number parser and commodity parser would fight over the `10`.
 
 ---
 
-### `app/examples/sample.journal`
+### `app/core/src/journal.rs` — the assembler
 
-A hand-written ledger file in the standard `ledger`/`hledger` format. Not Rust
-code — just plain text the parser will read. Covers:
-- Opening balances
-- Cleared (`*`) and pending (`!`) transactions
-- Transaction codes like `(GS-001)`
-- Inferred amounts (one posting with no number — computed automatically)
-- Inline comments and tags
+Takes the flat `Vec<Entry>` from the parser and folds it into a `Journal`: the
+transaction list plus first-seen-order indexes of accounts and commodities, the
+alias table, and any non-fatal `warnings`. Two entry points:
+
+- `Journal::parse_str(text)` — assemble from in-memory text. `include` directives
+  can't be resolved (no base directory) and are recorded as warnings.
+- `Journal::from_path(path)` — additionally follows `include` directives,
+  reading each file relative to the including file's directory.
+
+Aliases are applied to every account before it's indexed: an exact full-name
+match wins, otherwise the longest matching leading path segment is rewritten
+(`alias A = Assets` turns `A:Checking` into `Assets:Checking`).
 
 **Behavioral examples:**
 
-- Add a malformed transaction (e.g. two postings both missing amounts) → nothing
-  breaks right now because there is no parser yet. In Phase 2, the parser will
-  produce a friendly error pointing at the bad line.
-- Rename the file to `demo.journal` → none of the Rust code breaks (no file is
-  hardcoded to this name yet). The path gets passed via `-f` flag in Phase 3.
+- Call `Journal::parse_str` on text containing `include foo.journal` → the
+  include is recorded in `journal.warnings` rather than failing; `from_path`
+  would actually read the file.
+- Add an `alias Cash = Assets:Checking` line → every posting to `Cash` (or
+  `Cash:...`) is rewritten before indexing.
+- Change `accounts` from `IndexSet` to `HashSet` → still compiles, but accounts
+  no longer report in first-seen order, breaking the ordering assertion in
+  `indexes_accounts_and_commodities_in_order`.
+- Point `from_path` at a missing file → you get a `JournalError::Io`, not a
+  parse error — the two failure modes are distinct variants.
+
+---
+
+### `app/core/tests/sample_journal.rs` — integration test
+
+Files under `tests/` are compiled as **separate crates** that can only use the
+public API (like an external user would). This one loads
+`examples/sample.journal` via `Journal::from_path` and asserts the whole thing
+parses, every transaction balances, the inferred opening balance is `-$7,500`,
+and the hand-computed `Assets:Checking` total (`$11,185.98`) matches.
+
+**Behavioral examples:**
+
+- Break a line in `examples/sample.journal` (e.g. a bad amount) → this test fails
+  with the caret diagnostic, since `from_path` returns a `JournalError`.
+- Add a transaction to the sample → the `sample_journal_parses` count assertion
+  (`== 9`) fails until you update it.
 
 ---
 
@@ -339,11 +345,11 @@ cd ~/Rust/tally/app
 | Run the binary | `cargo run -p tally` |
 | Run all tests | `cargo test` |
 | Run tests, show output | `cargo test -- --nocapture` |
-| Run a single test by name | `cargo test amount_add` |
+| Run a single test by name | `cargo test infers_the_blank_posting` |
+| Test just the parser module | `cargo test -p tally-core parser` |
 | Format code | `cargo fmt` |
 | Check formatting without changing | `cargo fmt --check` |
 | Lint (like eslint) | `cargo clippy` |
-| Check for outdated deps | `cargo outdated` |
 | Add a dependency | `cargo add <crate-name> -p tally-core` |
 
 > `-p tally-core` or `-p tally` tells Cargo which crate in the workspace you
@@ -357,9 +363,9 @@ cd ~/Rust/tally/app
 |-------|-----------|---------|
 | Crate names | `kebab-case` | `tally-core` |
 | Crate names in code | `snake_case` | `use tally_core::...` |
-| Files & modules | `snake_case` | `model.rs`, `source_span` |
-| Types (struct/enum) | `PascalCase` | `Transaction`, `CommodityPosition` |
-| Functions & variables | `snake_case` | `is_balanced()`, `source_span` |
+| Files & modules | `snake_case` | `parser.rs`, `source_span` |
+| Types (struct/enum) | `PascalCase` | `ParseError`, `Directive` |
+| Functions & variables | `snake_case` | `parse_amount()`, `find_amount_sep` |
 | Constants | `SCREAMING_SNAKE_CASE` | `MAX_POSTINGS` |
 
 ---
@@ -368,7 +374,7 @@ cd ~/Rust/tally/app
 
 | Phase | Adds | New modules in `core/` |
 |-------|------|------------------------|
-| 2 | Journal parser — turns `.journal` text into the model | `parser.rs`, `journal.rs` |
+| 2 ✅ | Journal parser — turns `.journal` text into the model | `error.rs`, `parser.rs`, `journal.rs` |
 | 3 | CLI commands: `bal`, `reg`, `accounts`, `print` | `query.rs`, `report.rs` |
 | 4 | TUI: Register, Balances, Accounts views | (in `tally/src/tui/`) |
 | 5 | TUI: Add/edit transactions, write back to file | (in `tally/src/tui/`) |

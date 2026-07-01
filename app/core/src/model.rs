@@ -18,11 +18,17 @@ pub struct Commodity {
 
 impl Commodity {
     pub fn prefixed(symbol: impl Into<String>) -> Self {
-        Self { symbol: symbol.into(), position: CommodityPosition::Prefix }
+        Self {
+            symbol: symbol.into(),
+            position: CommodityPosition::Prefix,
+        }
     }
 
     pub fn suffixed(symbol: impl Into<String>) -> Self {
-        Self { symbol: symbol.into(), position: CommodityPosition::Suffix }
+        Self {
+            symbol: symbol.into(),
+            position: CommodityPosition::Suffix,
+        }
     }
 }
 
@@ -34,12 +40,18 @@ pub struct Amount {
 
 impl Amount {
     pub fn new(quantity: Decimal, commodity: Commodity) -> Self {
-        Self { quantity, commodity }
+        Self {
+            quantity,
+            commodity,
+        }
     }
 
     pub fn checked_add(self, other: Self) -> Option<Self> {
         if self.commodity == other.commodity {
-            Some(Self { quantity: self.quantity + other.quantity, commodity: self.commodity })
+            Some(Self {
+                quantity: self.quantity + other.quantity,
+                commodity: self.commodity,
+            })
         } else {
             None
         }
@@ -50,7 +62,8 @@ impl std::ops::Add for Amount {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        self.checked_add(other).expect("cannot add amounts with different commodities")
+        self.checked_add(other)
+            .expect("cannot add amounts with different commodities")
     }
 }
 
@@ -58,7 +71,10 @@ impl std::ops::Neg for Amount {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self { quantity: -self.quantity, commodity: self.commodity }
+        Self {
+            quantity: -self.quantity,
+            commodity: self.commodity,
+        }
     }
 }
 
@@ -79,7 +95,11 @@ impl Account {
     }
 
     pub fn parent(&self) -> Option<Account> {
-        if self.0.len() > 1 { Some(Account(self.0[..self.0.len() - 1].to_vec())) } else { None }
+        if self.0.len() > 1 {
+            Some(Account(self.0[..self.0.len() - 1].to_vec()))
+        } else {
+            None
+        }
     }
 
     pub fn top_level(&self) -> &str {
@@ -126,7 +146,13 @@ pub struct Posting {
 
 impl Posting {
     pub fn new(account: Account, amount: Option<Amount>) -> Self {
-        Self { account, amount, status: None, comment: None, tags: IndexMap::new() }
+        Self {
+            account,
+            amount,
+            status: None,
+            comment: None,
+            tags: IndexMap::new(),
+        }
     }
 }
 
@@ -173,8 +199,9 @@ impl Transaction {
         let mut totals: IndexMap<String, Decimal> = IndexMap::new();
         for posting in &self.postings {
             if let Some(ref amount) = posting.amount {
-                *totals.entry(amount.commodity.symbol.clone()).or_insert(Decimal::ZERO) +=
-                    amount.quantity;
+                *totals
+                    .entry(amount.commodity.symbol.clone())
+                    .or_insert(Decimal::ZERO) += amount.quantity;
             }
         }
         totals.values().all(|&total| total == Decimal::ZERO)
@@ -234,8 +261,12 @@ mod tests {
     fn transaction_balanced_with_inferred_posting() {
         let date = Date::new(2026, 1, 5).unwrap();
         let mut txn = Transaction::new(date, "Grocery Store");
-        txn.postings.push(Posting::new(Account::parse("Expenses:Food"), Some(usd(dec!(45.00)))));
-        txn.postings.push(Posting::new(Account::parse("Assets:Checking"), None));
+        txn.postings.push(Posting::new(
+            Account::parse("Expenses:Food"),
+            Some(usd(dec!(45.00))),
+        ));
+        txn.postings
+            .push(Posting::new(Account::parse("Assets:Checking"), None));
         assert!(txn.is_balanced());
     }
 
@@ -243,10 +274,14 @@ mod tests {
     fn transaction_balanced_with_explicit_amounts() {
         let date = Date::new(2026, 1, 15).unwrap();
         let mut txn = Transaction::new(date, "Salary");
-        txn.postings
-            .push(Posting::new(Account::parse("Assets:Checking"), Some(usd(dec!(3500.00)))));
-        txn.postings
-            .push(Posting::new(Account::parse("Income:Salary"), Some(usd(dec!(-3500.00)))));
+        txn.postings.push(Posting::new(
+            Account::parse("Assets:Checking"),
+            Some(usd(dec!(3500.00))),
+        ));
+        txn.postings.push(Posting::new(
+            Account::parse("Income:Salary"),
+            Some(usd(dec!(-3500.00))),
+        ));
         assert!(txn.is_balanced());
     }
 
@@ -254,8 +289,10 @@ mod tests {
     fn transaction_unbalanced_two_inferred_postings() {
         let date = Date::new(2026, 1, 1).unwrap();
         let mut txn = Transaction::new(date, "Bad entry");
-        txn.postings.push(Posting::new(Account::parse("Assets:Checking"), None));
-        txn.postings.push(Posting::new(Account::parse("Equity:Opening"), None));
+        txn.postings
+            .push(Posting::new(Account::parse("Assets:Checking"), None));
+        txn.postings
+            .push(Posting::new(Account::parse("Equity:Opening"), None));
         assert!(!txn.is_balanced());
     }
 }
