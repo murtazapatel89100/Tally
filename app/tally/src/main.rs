@@ -71,8 +71,12 @@ fn main() -> miette::Result<()> {
 
     match cli.command {
         None => {
-            let journal = load(file)?;
-            tui::run(journal)?;
+            let path = file.ok_or_else(|| miette!("no journal file; use -f FILE or set $TALLY_FILE"))?;
+            let journal = Journal::from_path(&path).map_err(|e| match e {
+                JournalError::Parse(pe) => miette::Report::new(pe),
+                JournalError::Io { path, source } => miette!("cannot read '{path}': {source}"),
+            })?;
+            tui::run(journal, path)?;
         }
 
         Some(Command::Accounts) => {

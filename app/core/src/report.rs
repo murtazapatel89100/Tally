@@ -26,6 +26,7 @@ pub struct RegRow {
     pub account: Account,
     pub amount: Option<Amount>,
     pub running: Vec<Amount>,
+    pub txn_idx: usize,
 }
 
 pub struct RegReport {
@@ -112,7 +113,7 @@ pub fn register(journal: &Journal, query: &Query) -> RegReport {
     let mut running: AmountMap = IndexMap::new();
     let mut rows = Vec::new();
 
-    for txn in &journal.transactions {
+    for (txn_idx, txn) in journal.transactions.iter().enumerate() {
         if !query.matches_txn(txn) {
             continue;
         }
@@ -129,6 +130,7 @@ pub fn register(journal: &Journal, query: &Query) -> RegReport {
                 account: posting.account.clone(),
                 amount: posting.amount.clone(),
                 running: amtmap_to_vec_all(&running),
+                txn_idx,
             });
         }
     }

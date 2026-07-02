@@ -1,5 +1,9 @@
+pub mod form;
+pub mod ui;
+
 use std::collections::HashSet;
 use std::io;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crossterm::{
@@ -16,7 +20,7 @@ use tally_core::{
     report::{self, BalReport, RegRow},
 };
 
-pub mod ui;
+use form::{FormState, Focus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
@@ -46,6 +50,7 @@ pub struct AccState {
 
 pub struct App {
     pub journal: Journal,
+    pub journal_path: PathBuf,
     pub view: View,
     pub filter: String,
     pub filtering: bool,
@@ -54,6 +59,7 @@ pub struct App {
     pub reg: RegState,
     pub acc: AccState,
     pub drill_stack: Vec<(View, Option<String>)>,
+    pub form: Option<FormState>,
 }
 
 fn compute_visible(report: &BalReport, collapsed: &HashSet<String>) -> Vec<usize> {
@@ -76,7 +82,7 @@ fn compute_visible(report: &BalReport, collapsed: &HashSet<String>) -> Vec<usize
 }
 
 impl App {
-    pub fn new(journal: Journal) -> Self {
+    pub fn new(journal: Journal, path: PathBuf) -> Self {
         let q = Query::default();
         let bal_report = report::balance(&journal, &q);
         let reg_report = report::register(&journal, &q);
@@ -100,6 +106,7 @@ impl App {
 
         App {
             journal,
+            journal_path: path,
             view: View::Balances,
             filter: String::new(),
             filtering: false,
@@ -121,6 +128,65 @@ impl App {
                 list_state: acc_ls,
             },
             drill_stack: Vec::new(),
+            form: None,
+        }
+    }
+
+    pub fn reload(&mut self, journal: Journal) {
+        self.journal = journal;
+        let q = Query::default();
+        let bal_report = report::balance(&self.journal, &q);
+        let reg_report = report::register(&self.journal, &q);
+        let accounts: Vec<Account> = self.journal.accounts.iter().cloned().collect();
+        let n = accounts.len();
+        let visible = compute_visible(&bal_report, &self.bal.collapsed);
+
+        self.bal.report = bal_report;
+        self.bal.visible = visible;
+        self.bal.list_state.select(Some(0));
+
+        self.reg.rows = reg_report.rows;
+        self.reg.table_state.select(Some(0));
+        self.reg.account_filter = None;
+
+        self.acc.all = accounts;
+        self.acc.filtered = (0..n).collect();
+        self.acc.list_state.select(Some(0));
+
+        self.drill_stack.clear();
+        self.filter.clear();
+        self.filtering = false;
+    }
+
+    pub fn open_new_form(&mut self) {
+        self.form = Some(FormState::new_transaction());
+        if let Some(f) = &mut self.form {
+            f.update_completions(&self.acc.all);
+        }
+    }
+
+    pub fn open_edit_form(&mut self) {
+        if self.view != View::Register {
+            return;
+        }
+        let sel = match self.reg.table_state.selected() {
+            Some(i) => i,
+            None => return,
+        };
+        let row = match self.reg.rows.get(sel) {
+            Some(r) => r,
+            None => return,
+        };
+        let txn = match self.journal.transactions.get(row.txn_idx) {
+            Some(t) => t,
+            None => return,
+        };
+        if txn.source_span.is_none() {
+            return;
+        }
+        self.form = Some(FormState::from_transaction(txn));
+        if let Some(f) = &mut self.form {
+            f.update_completions(&self.acc.all);
         }
     }
 
@@ -235,25 +301,13 @@ impl App {
     pub fn drill_into_register(&mut self) {
         let acc = match self.view {
             View::Accounts => {
-                let vi = match self.acc.list_state.selected() {
-                    Some(i) => i,
-                    None => return,
-                };
-                let ai = match self.acc.filtered.get(vi) {
-                    Some(&i) => i,
-                    None => return,
-                };
+                let vi = match self.acc.list_state.selected() { Some(i) => i, None => return };
+                let ai = match self.acc.filtered.get(vi) { Some(&i) => i, None => return };
                 self.acc.all[ai].as_str()
             }
             View::Balances => {
-                let vi = match self.bal.list_state.selected() {
-                    Some(i) => i,
-                    None => return,
-                };
-                let ri = match self.bal.visible.get(vi) {
-                    Some(&i) => i,
-                    None => return,
-                };
+                let vi = match self.bal.list_state.selected() { Some(i) => i, None => return };
+                let ri = match self.bal.visible.get(vi) { Some(&i) => i, None => return };
                 self.bal.report.rows[ri].account.as_str()
             }
             View::Register => return,
@@ -317,10 +371,10 @@ impl App {
     }
 
     fn apply_filter(&mut self) {
-        let fl = self.filter.to_lowercase();
         match self.view {
             View::Balances => self.rebuild_bal(),
             View::Register => {
+                let fl = self.filter.to_lowercase();
                 let q = Query {
                     account: self.reg.account_filter.clone(),
                     payee: if fl.is_empty() { None } else { Some(self.filter.clone()) },
@@ -351,7 +405,8 @@ impl App {
 
     fn rebuild_acc(&mut self) {
         let fl = self.filter.to_lowercase();
-        self.acc.filtered = self.acc
+        self.acc.filtered = self
+            .acc
             .all
             .iter()
             .enumerate()
@@ -374,7 +429,7 @@ impl App {
     }
 }
 
-pub fn run(journal: Journal) -> miette::Result<()> {
+pub fn run(journal: Journal, path: PathBuf) -> miette::Result<()> {
     install_panic_hook();
 
     enable_raw_mode().map_err(|e| miette!("terminal: {e}"))?;
@@ -383,7 +438,7 @@ pub fn run(journal: Journal) -> miette::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).map_err(|e| miette!("{e}"))?;
 
-    let mut app = App::new(journal);
+    let mut app = App::new(journal, path);
     let result = event_loop(&mut terminal, &mut app);
 
     disable_raw_mode().ok();
@@ -413,6 +468,10 @@ fn event_loop<B: ratatui::backend::Backend>(
 fn handle_key(app: &mut App, key: KeyEvent) -> bool {
     if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
         return false;
+    }
+
+    if app.form.is_some() {
+        return handle_form_key(app, key);
     }
 
     if app.show_help {
@@ -453,9 +512,184 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         KeyCode::Enter => app.drill_into_register(),
         KeyCode::Esc | KeyCode::Char('u') => app.go_back(),
         KeyCode::Char(' ') | KeyCode::Char('o') => app.toggle_collapse(),
+        KeyCode::Char('n') => app.open_new_form(),
+        KeyCode::Char('e') => app.open_edit_form(),
         _ => {}
     }
     true
+}
+
+fn handle_form_key(app: &mut App, key: KeyEvent) -> bool {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+
+    if ctrl {
+        match key.code {
+            KeyCode::Char('s') => {
+                try_save(app);
+                return true;
+            }
+            KeyCode::Char('n') => {
+                if let Some(f) = &mut app.form {
+                    f.add_posting();
+                    let accounts = app.acc.all.clone();
+                    if let Some(f) = &mut app.form {
+                        f.update_completions(&accounts);
+                    }
+                }
+                return true;
+            }
+            KeyCode::Char('d') => {
+                if let Some(f) = &mut app.form {
+                    f.delete_posting();
+                    f.update_balance();
+                }
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    let Some(form) = &mut app.form else { return true };
+
+    match key.code {
+        KeyCode::Esc => {
+            if form.completion_open {
+                form.completion_open = false;
+            } else {
+                app.form = None;
+            }
+            return true;
+        }
+        KeyCode::Tab if shift => {
+            form.tab_prev();
+            let accounts = app.acc.all.clone();
+            if let Some(f) = &mut app.form {
+                f.update_completions(&accounts);
+                if matches!(f.focus, Focus::PostingAccount(_)) {
+                    f.completion_open = !f.completions.is_empty();
+                }
+            }
+            return true;
+        }
+        KeyCode::Tab => {
+            form.tab_next();
+            let accounts = app.acc.all.clone();
+            if let Some(f) = &mut app.form {
+                f.update_completions(&accounts);
+                if matches!(f.focus, Focus::PostingAccount(_)) {
+                    f.completion_open = !f.completions.is_empty();
+                }
+            }
+            return true;
+        }
+        _ => {}
+    }
+
+    let Some(form) = &mut app.form else { return true };
+
+    if form.completion_open {
+        match key.code {
+            KeyCode::Up => {
+                if form.completion_sel > 0 {
+                    form.completion_sel -= 1;
+                }
+                return true;
+            }
+            KeyCode::Down => {
+                if form.completion_sel + 1 < form.completions.len() {
+                    form.completion_sel += 1;
+                }
+                return true;
+            }
+            KeyCode::Enter => {
+                form.select_completion();
+                form.update_balance();
+                return true;
+            }
+            _ => {
+                form.completion_open = false;
+            }
+        }
+    }
+
+    match &form.focus.clone() {
+        Focus::Date => {
+            if key.code == KeyCode::Enter {
+                form.tab_next();
+            } else {
+                form.date.handle(key.code);
+            }
+        }
+        Focus::Status => {
+            if key.code == KeyCode::Char(' ') || key.code == KeyCode::Enter {
+                form.cycle_status();
+            }
+        }
+        Focus::Payee => {
+            if key.code == KeyCode::Enter {
+                form.tab_next();
+            } else {
+                form.payee.handle(key.code);
+            }
+        }
+        Focus::PostingAccount(i) => {
+            let i = *i;
+            form.postings[i].account.handle(key.code);
+            let accounts = app.acc.all.clone();
+            if let Some(f) = &mut app.form {
+                f.update_completions(&accounts);
+                f.completion_open = !f.completions.is_empty()
+                    && !f.postings[i].account.text.is_empty();
+                f.update_balance();
+            }
+            return true;
+        }
+        Focus::PostingAmount(i) => {
+            let i = *i;
+            if key.code == KeyCode::Enter {
+                form.tab_next();
+            } else {
+                form.postings[i].amount.handle(key.code);
+                form.update_balance();
+            }
+        }
+    }
+
+    true
+}
+
+fn try_save(app: &mut App) {
+    let form = match &app.form {
+        Some(f) => f,
+        None => return,
+    };
+
+    let txn = match form.try_build() {
+        Ok(t) => t,
+        Err(e) => {
+            if let Some(f) = &mut app.form {
+                f.error = Some(e);
+            }
+            return;
+        }
+    };
+
+    let path = app.journal_path.clone();
+    let form = app.form.as_ref().unwrap();
+
+    match form::save_and_reload(form, &txn, &path) {
+        Ok(new_journal) => {
+            app.form = None;
+            app.reload(new_journal);
+            app.view = View::Register;
+        }
+        Err(e) => {
+            if let Some(f) = &mut app.form {
+                f.error = Some(e);
+            }
+        }
+    }
 }
 
 fn install_panic_hook() {
