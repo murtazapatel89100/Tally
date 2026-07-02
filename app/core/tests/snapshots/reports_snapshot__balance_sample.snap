@@ -1,0 +1,19 @@
+---
+source: core/tests/reports_snapshot.rs
+expression: rep.render()
+---
+$14,185.98  Assets
+$11,185.98    Checking
+ $3,000.00    Savings
+-$7,500.00  Equity
+-$7,500.00    Opening Balances
+   $314.02  Expenses
+   $226.52    Food
+     $4.75      Coffee
+   $221.77      Groceries
+    $87.50    Utilities
+    $87.50      Electric
+-$7,000.00  Income
+-$7,000.00    Salary
+------------
+         0

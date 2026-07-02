@@ -1,0 +1,9 @@
+---
+source: core/tests/reports_snapshot.rs
+expression: rep.render()
+---
+$14,185.98  Assets
+$11,185.98    Checking
+ $3,000.00    Savings
+------------
+$14,185.98

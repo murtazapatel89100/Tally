@@ -13,5 +13,9 @@ thiserror = "2"
 winnow = "1.0.3"
 miette = { version = "7.6.0", features = ["fancy"] }
 
+[dev-dependencies]
+insta = "1"
+rust_decimal_macros = "1"
+
 [lints]
 workspace = true

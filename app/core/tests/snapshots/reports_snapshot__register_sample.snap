@@ -1,0 +1,23 @@
+---
+source: core/tests/reports_snapshot.rs
+expression: rep.render()
+---
+2026-01-01 Opening Balances         Assets:Checking                $5,000.00     $5,000.00
+2026-01-01 Opening Balances         Assets:Savings                 $2,500.00     $7,500.00
+2026-01-01 Opening Balances         Equity:Opening Balances       -$7,500.00         $0.00
+2026-01-05 Grocery Store            Expenses:Food:Groceries          $123.45       $123.45
+2026-01-05 Grocery Store            Assets:Checking                 -$123.45         $0.00
+2026-01-10 Electric Bill            Expenses:Utilities:Elec...        $87.50        $87.50
+2026-01-10 Electric Bill            Liabilities:CreditCard           -$87.50         $0.00
+2026-01-15 Employer                 Assets:Checking                $3,500.00     $3,500.00
+2026-01-15 Employer                 Income:Salary                 -$3,500.00         $0.00
+2026-01-20 Blue Bottle Coffee       Expenses:Food:Coffee               $4.75         $4.75
+2026-01-20 Blue Bottle Coffee       Assets:Checking                   -$4.75         $0.00
+2026-01-28 Credit Card Payment      Liabilities:CreditCard            $87.50        $87.50
+2026-01-28 Credit Card Payment      Assets:Checking                  -$87.50         $0.00
+2026-02-01 Grocery Store            Expenses:Food:Groceries           $98.32        $98.32
+2026-02-01 Grocery Store            Assets:Checking                  -$98.32         $0.00
+2026-02-15 Employer                 Assets:Checking                $3,500.00     $3,500.00
+2026-02-15 Employer                 Income:Salary                 -$3,500.00         $0.00
+2026-02-18 Transfer to Savings      Assets:Savings                   $500.00       $500.00
+2026-02-18 Transfer to Savings      Assets:Checking                 -$500.00         $0.00
