@@ -1,3 +1,5 @@
+mod tui;
+
 use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser, Subcommand};
@@ -14,10 +16,16 @@ use tally_core::{
 #[derive(Parser)]
 #[command(name = "tally", about = "Plain-text double-entry accounting", version)]
 struct Cli {
-    #[arg(short, long, env = "TALLY_FILE", global = true, help = "Journal file ($TALLY_FILE or $LEDGER_FILE)")]
+    #[arg(
+        short,
+        long,
+        env = "TALLY_FILE",
+        global = true,
+        help = "Journal file ($TALLY_FILE or $LEDGER_FILE)"
+    )]
     file: Option<PathBuf>,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
@@ -62,33 +70,38 @@ fn main() -> miette::Result<()> {
         .or_else(|| std::env::var("LEDGER_FILE").ok().map(PathBuf::from));
 
     match cli.command {
-        Command::Accounts => {
+        None => {
+            let journal = load(file)?;
+            tui::run(journal)?;
+        }
+
+        Some(Command::Accounts) => {
             let journal = load(file)?;
             for account in &journal.accounts {
                 println!("{}", account.as_str());
             }
         }
 
-        Command::Print => {
+        Some(Command::Print) => {
             let journal = load(file)?;
             print!("{}", printer::print_journal(&journal));
         }
 
-        Command::Bal { account, from, to } => {
+        Some(Command::Bal { account, from, to }) => {
             let journal = load(file)?;
             let query = build_query(account, from, to)?;
             let rep = report::balance(&journal, &query);
             print!("{}", rep.render());
         }
 
-        Command::Reg { account, from, to } => {
+        Some(Command::Reg { account, from, to }) => {
             let journal = load(file)?;
             let query = build_query(account, from, to)?;
             let rep = report::register(&journal, &query);
             print!("{}", rep.render());
         }
 
-        Command::Completions { shell } => {
+        Some(Command::Completions { shell }) => {
             let mut cmd = Cli::command();
             generate(shell, &mut cmd, "tally", &mut std::io::stdout());
         }
