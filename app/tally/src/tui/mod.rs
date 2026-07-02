@@ -1,13 +1,17 @@
 pub mod form;
+pub mod theme;
 pub mod ui;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+        MouseButton, MouseEvent, MouseEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -60,6 +64,8 @@ pub struct App {
     pub acc: AccState,
     pub drill_stack: Vec<(View, Option<String>)>,
     pub form: Option<FormState>,
+    pub viewport_height: u16,
+    pub list_top: u16,
 }
 
 fn compute_visible(report: &BalReport, collapsed: &HashSet<String>) -> Vec<usize> {
@@ -129,6 +135,8 @@ impl App {
             },
             drill_stack: Vec::new(),
             form: None,
+            viewport_height: 0,
+            list_top: 0,
         }
     }
 
@@ -429,12 +437,140 @@ impl App {
     }
 }
 
+impl App {
+    fn current_len(&self) -> usize {
+        match self.view {
+            View::Balances => self.bal.visible.len(),
+            View::Register => self.reg.rows.len(),
+            View::Accounts => self.acc.filtered.len(),
+        }
+    }
+
+    fn selected_index(&self) -> Option<usize> {
+        match self.view {
+            View::Balances => self.bal.list_state.selected(),
+            View::Register => self.reg.table_state.selected(),
+            View::Accounts => self.acc.list_state.selected(),
+        }
+    }
+
+    fn selected_offset(&self) -> usize {
+        match self.view {
+            View::Balances => self.bal.list_state.offset(),
+            View::Register => self.reg.table_state.offset(),
+            View::Accounts => self.acc.list_state.offset(),
+        }
+    }
+
+    fn set_selected(&mut self, i: usize) {
+        match self.view {
+            View::Balances => self.bal.list_state.select(Some(i)),
+            View::Register => self.reg.table_state.select(Some(i)),
+            View::Accounts => self.acc.list_state.select(Some(i)),
+        }
+    }
+
+    pub fn scroll_by(&mut self, delta: isize) {
+        let len = self.current_len();
+        if len == 0 {
+            return;
+        }
+        let cur = self.selected_index().unwrap_or(0) as isize;
+        let new = (cur + delta).clamp(0, len as isize - 1) as usize;
+        self.set_selected(new);
+    }
+
+    pub fn page(&mut self, down: bool, half: bool) {
+        let mut step = self.viewport_height.max(1) as isize;
+        if half {
+            step = (step / 2).max(1);
+        }
+        self.scroll_by(if down { step } else { -step });
+    }
+
+    pub fn click_select(&mut self, screen_row: u16) {
+        if screen_row < self.list_top {
+            return;
+        }
+        let rel = (screen_row - self.list_top) as usize;
+        let idx = self.selected_offset() + rel;
+        if idx < self.current_len() {
+            self.set_selected(idx);
+        }
+    }
+
+    pub fn collapse_all(&mut self) {
+        if self.view != View::Balances {
+            return;
+        }
+        let all: Vec<String> = self.bal.report.rows.iter().map(|r| r.account.as_str()).collect();
+        self.bal.collapsed.clear();
+        for s in &all {
+            let has_children = all.iter().any(|o| o != s && o.starts_with(&format!("{s}:")));
+            if has_children {
+                self.bal.collapsed.insert(s.clone());
+            }
+        }
+        self.bal.visible = compute_visible(&self.bal.report, &self.bal.collapsed);
+        let n = self.bal.visible.len();
+        self.bal.list_state.select(if n > 0 { Some(0) } else { None });
+    }
+
+    pub fn expand_all(&mut self) {
+        if self.view != View::Balances {
+            return;
+        }
+        self.bal.collapsed.clear();
+        self.bal.visible = compute_visible(&self.bal.report, &self.bal.collapsed);
+        let n = self.bal.visible.len();
+        self.bal.list_state.select(if n > 0 { Some(0) } else { None });
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.current_len()
+    }
+
+    pub fn net_worth(&self) -> String {
+        use tally_core::model::{Amount, Commodity};
+        let mut totals: HashMap<String, (rust_decimal::Decimal, Commodity)> = HashMap::new();
+        let mut order: Vec<String> = Vec::new();
+        for txn in &self.journal.transactions {
+            for p in &txn.postings {
+                let top = p.account.top_level();
+                if top == "Assets" || top == "Liabilities" {
+                    if let Some(a) = &p.amount {
+                        let key = a.commodity.symbol.clone();
+                        if !totals.contains_key(&key) {
+                            order.push(key.clone());
+                        }
+                        let e = totals
+                            .entry(key)
+                            .or_insert_with(|| (rust_decimal::Decimal::ZERO, a.commodity.clone()));
+                        e.0 += a.quantity;
+                    }
+                }
+            }
+        }
+        let parts: Vec<String> = order
+            .iter()
+            .filter_map(|k| totals.get(k))
+            .filter(|(q, _)| *q != rust_decimal::Decimal::ZERO)
+            .map(|(q, c)| tally_core::printer::format_amount(&Amount::new(*q, c.clone())))
+            .collect();
+        if parts.is_empty() {
+            "0".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
 pub fn run(journal: Journal, path: PathBuf) -> miette::Result<()> {
     install_panic_hook();
 
     enable_raw_mode().map_err(|e| miette!("terminal: {e}"))?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen).map_err(|e| miette!("{e}"))?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture).map_err(|e| miette!("{e}"))?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).map_err(|e| miette!("{e}"))?;
 
@@ -442,7 +578,7 @@ pub fn run(journal: Journal, path: PathBuf) -> miette::Result<()> {
     let result = event_loop(&mut terminal, &mut app);
 
     disable_raw_mode().ok();
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
+    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture).ok();
     terminal.show_cursor().ok();
 
     result
@@ -456,12 +592,28 @@ fn event_loop<B: ratatui::backend::Backend>(
         terminal.draw(|f| ui::draw(f, app)).map_err(|e| miette!("{e}"))?;
 
         if event::poll(Duration::from_millis(200)).map_err(|e| miette!("{e}"))? {
-            if let Event::Key(key) = event::read().map_err(|e| miette!("{e}"))? {
-                if !handle_key(app, key) {
-                    return Ok(());
+            match event::read().map_err(|e| miette!("{e}"))? {
+                Event::Key(key) => {
+                    if !handle_key(app, key) {
+                        return Ok(());
+                    }
                 }
+                Event::Mouse(me) => handle_mouse(app, me),
+                _ => {}
             }
         }
+    }
+}
+
+fn handle_mouse(app: &mut App, me: MouseEvent) {
+    if app.form.is_some() || app.show_help {
+        return;
+    }
+    match me.kind {
+        MouseEventKind::ScrollDown => app.scroll_by(1),
+        MouseEventKind::ScrollUp => app.scroll_by(-1),
+        MouseEventKind::Down(MouseButton::Left) => app.click_select(me.row),
+        _ => {}
     }
 }
 
@@ -490,10 +642,28 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         return true;
     }
 
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        match key.code {
+            KeyCode::Char('d') => {
+                app.page(true, true);
+                return true;
+            }
+            KeyCode::Char('u') => {
+                app.page(false, true);
+                return true;
+            }
+            _ => {}
+        }
+    }
+
     match key.code {
         KeyCode::Char('q') | KeyCode::Char('Q') => return false,
         KeyCode::Char('j') | KeyCode::Down => app.scroll_down(),
         KeyCode::Char('k') | KeyCode::Up => app.scroll_up(),
+        KeyCode::PageDown => app.page(true, false),
+        KeyCode::PageUp => app.page(false, false),
+        KeyCode::Char('[') => app.collapse_all(),
+        KeyCode::Char(']') => app.expand_all(),
         KeyCode::Char('g') => app.goto_top(),
         KeyCode::Char('G') => app.goto_bottom(),
         KeyCode::Char('1') | KeyCode::Char('b') => app.switch_view(View::Balances),
