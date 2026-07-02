@@ -1,16 +1,3 @@
-//! The journal parser — turns ledger/hledger text into the [`crate::model`].
-//!
-//! The grammar is line-oriented (this is what ledger and hledger do), so the
-//! parser walks the file a line at a time to decide *what* each line is —
-//! transaction header, posting, directive, or comment — and delegates the
-//! *token-level* work (dates, amounts, commodities) to small [`winnow`] parsers.
-//! That split keeps the whitespace-sensitive account/amount separation rule
-//! simple while still using a real parser-combinator for "the heart" (amounts).
-//!
-//! The public entry point is [`parse`], which returns a flat list of [`Entry`]
-//! values. Assembling those into a [`crate::journal::Journal`] (account index,
-//! alias resolution, includes) happens one layer up.
-
 use indexmap::IndexMap;
 use jiff::civil::Date;
 use rust_decimal::Decimal;
@@ -22,36 +9,21 @@ use winnow::{ModalResult, Parser};
 use crate::error::ParseError;
 use crate::model::{Account, Amount, Commodity, Posting, SourceSpan, Status, Transaction};
 
-/// A top-level item parsed from a journal file.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Entry {
-    /// A dated transaction with its postings.
     Transaction(Transaction),
-    /// A directive line (`account`, `alias`, `include`, ...).
     Directive(Directive),
 }
 
-/// A journal directive. Unrecognised directives are captured as [`Directive::Other`]
-/// so the caller can emit a warning rather than fail the whole parse.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
-    /// `include PATH` — pull in another journal file.
     Include(String),
-    /// `alias OLD = NEW` — rewrite account `OLD` to `NEW`.
     Alias { old: String, new: String },
-    /// `account NAME` — declare an account.
     Account(String),
-    /// `commodity SYM` — declare a commodity.
     Commodity(String),
-    /// Any other (unsupported) directive keyword; skipped with a warning.
     Other(String),
 }
 
-/// Parse `input` into a list of [`Entry`] values.
-///
-/// `name` is the file name shown in diagnostics (use `"<journal>"` for in-memory
-/// text). On the first unrecoverable syntax error this returns a [`ParseError`]
-/// carrying a caret that points at the offending token.
 pub fn parse(input: &str, name: &str) -> Result<Vec<Entry>, ParseError> {
     parse_inner(input).map_err(|e| {
         ParseError::new(
@@ -65,7 +37,6 @@ pub fn parse(input: &str, name: &str) -> Result<Vec<Entry>, ParseError> {
     })
 }
 
-/// Internal error carrying only byte offsets; [`parse`] pairs it with the source.
 struct PErr {
     start: usize,
     len: usize,
@@ -91,14 +62,11 @@ impl PErr {
     }
 }
 
-/// Byte offset of subslice `sub` within `whole`. `sub` MUST be a slice of `whole`.
 fn offset_in(sub: &str, whole: &str) -> usize {
     sub.as_ptr() as usize - whole.as_ptr() as usize
 }
 
 fn parse_inner(input: &str) -> Result<Vec<Entry>, PErr> {
-    // Pre-split into (byte_offset, line_without_newline) so every token can be
-    // mapped back to an absolute position in the file for diagnostics.
     let mut lines: Vec<(usize, &str)> = Vec::new();
     let mut offset = 0;
     for raw in input.split_inclusive('\n') {
@@ -131,7 +99,6 @@ fn parse_inner(input: &str) -> Result<Vec<Entry>, PErr> {
             .with_help("Postings must be indented under a `DATE PAYEE` header."));
         }
 
-        // Full-line comment.
         if matches!(first, ';' | '#' | '%' | '|' | '*') {
             i += 1;
             continue;
@@ -144,8 +111,6 @@ fn parse_inner(input: &str) -> Result<Vec<Entry>, PErr> {
         } else {
             entries.push(Entry::Directive(parse_directive(line, start)?));
             i += 1;
-            // Skip any indented continuation lines that belong to the directive
-            // (e.g. `account X` followed by indented metadata).
             while i < lines.len() {
                 let (_, l) = lines[i];
                 if l.starts_with(' ') || l.starts_with('\t') {
@@ -160,8 +125,6 @@ fn parse_inner(input: &str) -> Result<Vec<Entry>, PErr> {
     Ok(entries)
 }
 
-/// Parse a transaction starting at line `idx`; returns the transaction and the
-/// index of the first line *after* it.
 fn parse_transaction(lines: &[(usize, &str)], idx: usize) -> Result<(Transaction, usize), PErr> {
     let (start, header) = lines[idx];
     let mut txn = parse_header(header, start)?;
@@ -171,16 +134,14 @@ fn parse_transaction(lines: &[(usize, &str)], idx: usize) -> Result<(Transaction
     while i < lines.len() {
         let (pstart, pline) = lines[i];
         if pline.trim().is_empty() {
-            break; // a blank line terminates the transaction
+            break;
         }
         if !(pline.starts_with(' ') || pline.starts_with('\t')) {
-            break; // a non-indented line starts the next entry
+            break;
         }
 
         let content = pline.trim_start();
         if let Some(rest) = content.strip_prefix(';') {
-            // A standalone comment/tag line: attach it to the last posting, or
-            // to the transaction itself if none exists yet.
             if let Some(last) = txn.postings.last_mut() {
                 let plain = parse_comment(rest, &mut last.tags);
                 append_comment(&mut last.comment, plain);
@@ -201,7 +162,6 @@ fn parse_transaction(lines: &[(usize, &str)], idx: usize) -> Result<(Transaction
     Ok((txn, i))
 }
 
-/// Parse a `DATE [*|!] [(CODE)] PAYEE [; comment]` header line.
 fn parse_header(header: &str, start: usize) -> Result<Transaction, PErr> {
     let (date_tok, rest) = header.split_once(char::is_whitespace).ok_or_else(|| {
         PErr::new(
@@ -224,7 +184,6 @@ fn parse_header(header: &str, start: usize) -> Result<Transaction, PErr> {
 
     let mut rest = rest.trim_start();
 
-    // Optional cleared/pending marker.
     let mut status = Status::Uncleared;
     if let Some(r) = rest.strip_prefix('*') {
         status = Status::Cleared;
@@ -234,7 +193,6 @@ fn parse_header(header: &str, start: usize) -> Result<Transaction, PErr> {
         rest = r.trim_start();
     }
 
-    // Optional (CODE).
     let mut code = None;
     if let Some(r) = rest.strip_prefix('(')
         && let Some(close) = r.find(')')
@@ -243,7 +201,6 @@ fn parse_header(header: &str, start: usize) -> Result<Transaction, PErr> {
         rest = r[close + 1..].trim_start();
     }
 
-    // Payee runs up to an optional trailing comment.
     let (payee_part, comment_part) = match rest.split_once(';') {
         Some((p, c)) => (p, Some(c)),
         None => (rest, None),
@@ -259,18 +216,15 @@ fn parse_header(header: &str, start: usize) -> Result<Transaction, PErr> {
     Ok(txn)
 }
 
-/// Parse a single indented posting line.
 fn parse_posting(pline: &str, pstart: usize) -> Result<Posting, PErr> {
     let content = pline.trim_start();
 
-    // Split off a trailing comment.
     let (mut main, comment) = match content.split_once(';') {
         Some((m, c)) => (m, Some(c)),
         None => (content, None),
     };
     main = main.trim_end();
 
-    // Optional posting-level status marker (`* ` / `! `).
     let mut status = None;
     if let Some(r) = strip_marker(main, '*') {
         status = Some(Status::Cleared);
@@ -280,9 +234,6 @@ fn parse_posting(pline: &str, pstart: usize) -> Result<Posting, PErr> {
         main = r.trim_start();
     }
 
-    // The account name ends at the first run of 2+ spaces or a tab; whatever
-    // follows is the amount expression. A single space is part of the name
-    // (e.g. `Equity:Opening Balances`).
     let (account_str, amount_str) = match find_amount_sep(main) {
         Some(sep) => (main[..sep].trim_end(), main[sep..].trim()),
         None => (main, ""),
@@ -317,8 +268,6 @@ fn parse_posting(pline: &str, pstart: usize) -> Result<Posting, PErr> {
     Ok(posting)
 }
 
-/// Strip a leading status marker only when it is followed by whitespace (or is
-/// the whole string), so account names beginning with `*`/`!` are not mangled.
 fn strip_marker(s: &str, marker: char) -> Option<&str> {
     let rest = s.strip_prefix(marker)?;
     if rest.is_empty() || rest.starts_with(char::is_whitespace) {
@@ -328,7 +277,6 @@ fn strip_marker(s: &str, marker: char) -> Option<&str> {
     }
 }
 
-/// Byte index of the first `\t` or `"  "` (2+ spaces) in `s`, if any.
 fn find_amount_sep(s: &str) -> Option<usize> {
     let bytes = s.as_bytes();
     let mut i = 0;
@@ -344,7 +292,6 @@ fn find_amount_sep(s: &str) -> Option<usize> {
     None
 }
 
-/// Parse a `directive [args]` line.
 fn parse_directive(line: &str, start: usize) -> Result<Directive, PErr> {
     let (word, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
     let rest = rest.trim();
@@ -370,11 +317,6 @@ fn parse_directive(line: &str, start: usize) -> Result<Directive, PErr> {
     }
 }
 
-/// Fill in the amount of a single blank posting so the transaction balances.
-///
-/// Only the common single-commodity case is inferred; if the explicit postings
-/// span multiple commodities (which our one-amount-per-posting model can't
-/// represent) the blank is left as-is and [`Transaction::is_balanced`] reports it.
 fn infer_amounts(txn: &mut Transaction) {
     if txn.postings.iter().filter(|p| p.amount.is_none()).count() != 1 {
         return;
@@ -396,20 +338,12 @@ fn infer_amounts(txn: &mut Transaction) {
     }
 }
 
-// ── comment / tag extraction ────────────────────────────────────────────────
-
-/// Interpret comment `text`, pushing any tags into `tags` and returning the
-/// remaining free-text comment (if any).
-///
-/// Recognises `; :flag1:flag2:` (valueless flag tags) and `; key: value` typed
-/// tags; anything else is returned verbatim as a plain comment.
 fn parse_comment(text: &str, tags: &mut IndexMap<String, Option<String>>) -> Option<String> {
     let t = text.trim();
     if t.is_empty() {
         return None;
     }
 
-    // `:flag1:flag2:` form.
     if t.len() >= 2 && t.starts_with(':') && t.ends_with(':') {
         let inner: Vec<&str> = t[1..t.len() - 1].split(':').collect();
         if !inner.is_empty() && inner.iter().all(|s| is_tag_key(s)) {
@@ -420,7 +354,6 @@ fn parse_comment(text: &str, tags: &mut IndexMap<String, Option<String>>) -> Opt
         }
     }
 
-    // `key: value` form.
     if let Some(idx) = t.find(':') {
         let key = t[..idx].trim();
         let value = t[idx + 1..].trim();
@@ -442,7 +375,6 @@ fn is_tag_key(s: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
 }
 
-/// Append `extra` to an optional comment field, newline-separating existing text.
 fn append_comment(slot: &mut Option<String>, extra: Option<String>) {
     if let Some(text) = extra {
         match slot {
@@ -455,14 +387,10 @@ fn append_comment(slot: &mut Option<String>, extra: Option<String>) {
     }
 }
 
-// ── winnow token parsers ─────────────────────────────────────────────────────
-
-/// Parse a complete date string (`YYYY-MM-DD`, `/` or `.` separators allowed).
 pub fn parse_date(s: &str) -> Option<Date> {
     date.parse(s.trim()).ok()
 }
 
-/// Parse a complete amount string (prefixed or suffixed commodity).
 pub fn parse_amount(s: &str) -> Option<Amount> {
     alt((prefixed_amount, suffixed_amount)).parse(s.trim()).ok()
 }
@@ -485,22 +413,18 @@ fn date(input: &mut &str) -> ModalResult<Date> {
         .parse_next(input)
 }
 
-/// A signed decimal with optional thousands separators, e.g. `1,234.56`.
 fn number(input: &mut &str) -> ModalResult<Decimal> {
     take_while(1.., |c: char| c.is_ascii_digit() || c == ',' || c == '.')
         .try_map(|s: &str| Decimal::from_str_exact(&s.replace(',', "")))
         .parse_next(input)
 }
 
-/// Optional leading `+`/`-`, returning `-1` for a minus, `1` otherwise.
 fn sign(input: &mut &str) -> ModalResult<i32> {
     opt(one_of(['-', '+']))
         .map(|c| if c == Some('-') { -1 } else { 1 })
         .parse_next(input)
 }
 
-/// A commodity symbol: any run of non-numeric, non-space, non-sign characters
-/// (`$`, `€`, `USD`, `AAPL`, ...).
 fn commodity<'s>(input: &mut &'s str) -> ModalResult<&'s str> {
     take_while(1.., |c: char| {
         !c.is_ascii_digit()
@@ -514,7 +438,6 @@ fn commodity<'s>(input: &mut &'s str) -> ModalResult<&'s str> {
     .parse_next(input)
 }
 
-/// `[-]$1,234.56` — commodity before the number.
 fn prefixed_amount(input: &mut &str) -> ModalResult<Amount> {
     let outer = sign.parse_next(input)?;
     let sym = commodity.parse_next(input)?;
@@ -525,7 +448,6 @@ fn prefixed_amount(input: &mut &str) -> ModalResult<Amount> {
     Ok(Amount::new(quantity, Commodity::prefixed(sym)))
 }
 
-/// `1,234.56 USD` — commodity after the number (or absent).
 fn suffixed_amount(input: &mut &str) -> ModalResult<Amount> {
     let s = sign.parse_next(input)?;
     let n = number.parse_next(input)?;
@@ -672,7 +594,6 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.message, "invalid amount");
-        // The span should point at the amount token `$1..2`, not the whole line.
         let (offset, len) = (err.span.offset(), err.span.len());
         let slice = &"2026-01-01 * Bad\n    Assets:Cash    $1..2\n    B\n"[offset..offset + len];
         assert_eq!(slice, "$1..2");

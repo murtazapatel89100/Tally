@@ -1,10 +1,3 @@
-//! Assemble parsed [`Entry`] values into a [`Journal`].
-//!
-//! On top of the raw [`crate::parser`] output this layer resolves `alias`
-//! rewrites, expands `include` files (when parsing from a path), and builds the
-//! first-seen-order index of accounts and commodities used by the reports and
-//! the TUI.
-
 use std::path::{Path, PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
@@ -15,43 +8,29 @@ use crate::error::ParseError;
 use crate::model::{Account, Transaction};
 use crate::parser::{self, Directive, Entry};
 
-/// Anything that can go wrong loading a journal from disk.
 #[derive(Debug, Error, Diagnostic)]
 pub enum JournalError {
-    /// A syntax error in one of the journal files.
     #[error(transparent)]
     #[diagnostic(transparent)]
     Parse(#[from] ParseError),
-    /// A journal file (top-level or `include`d) could not be read.
     #[error("failed to read journal file `{path}`")]
     Io {
-        /// The path we tried to read.
         path: String,
-        /// The underlying I/O error.
         #[source]
         source: std::io::Error,
     },
 }
 
-/// A fully-assembled journal: transactions plus the derived indexes.
 #[derive(Debug, Default, Clone)]
 pub struct Journal {
-    /// Transactions in file order (with aliases already applied to accounts).
     pub transactions: Vec<Transaction>,
-    /// Every account seen (declared or used), in first-seen order.
     pub accounts: IndexSet<Account>,
-    /// Every commodity seen, in first-seen order.
     pub commodities: IndexSet<String>,
-    /// `alias OLD = NEW` rewrites, in declaration order.
     pub aliases: IndexMap<String, String>,
-    /// Non-fatal notes (skipped directives, unresolved includes, ...).
     pub warnings: Vec<String>,
 }
 
 impl Journal {
-    /// Assemble a journal from in-memory text. `include` directives cannot be
-    /// resolved here (there is no base directory) and become warnings; use
-    /// [`Journal::from_path`] to follow includes.
     pub fn parse_str(input: &str) -> Result<Journal, ParseError> {
         let entries = parser::parse(input, "<journal>")?;
         let mut journal = Journal::default();
@@ -59,8 +38,6 @@ impl Journal {
         Ok(journal)
     }
 
-    /// Load a journal from a file, recursively expanding `include` directives
-    /// relative to each file's directory.
     pub fn from_path(path: impl AsRef<Path>) -> Result<Journal, JournalError> {
         let entries = load_entries(path.as_ref())?;
         let mut journal = Journal::default();
@@ -112,8 +89,6 @@ impl Journal {
         }
     }
 
-    /// Apply the recorded aliases to an account: an exact full-name match wins,
-    /// otherwise the longest matching leading path segment is rewritten.
     fn resolve_alias(&self, account: &Account) -> Account {
         let full = account.as_str();
         if let Some(new) = self.aliases.get(&full) {
@@ -130,7 +105,6 @@ impl Journal {
     }
 }
 
-/// Read a journal file and recursively splice in any `include`d files.
 fn load_entries(path: &Path) -> Result<Vec<Entry>, JournalError> {
     let text = std::fs::read_to_string(path).map_err(|source| JournalError::Io {
         path: path.display().to_string(),
