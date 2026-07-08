@@ -42,6 +42,12 @@ const jsonLd = JSON.stringify({
 
 export default defineConfig({
   site: SITE,
+  // Use Astro's no-op passthrough image service so the build needs no native
+  // `sharp` binary (keeps CI installs script-free and reproducible). The docs
+  // site's images are small PNGs that don't require optimization.
+  image: {
+    service: { entrypoint: 'astro/assets/services/noop' },
+  },
   integrations: [
     sitemap(),
     starlight({
