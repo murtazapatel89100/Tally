@@ -1,13 +1,8 @@
 use proptest::prelude::*;
-use tally_core::journal::Journal;
-use tally_core::printer::print_journal;
-use tally_core::query::Query;
-use tally_core::report;
+use tally_core::{journal::Journal, printer::print_journal, query::Query, report};
 
 fn txn_block(date: &str, payee: &str, dollars: u32) -> String {
-    format!(
-        "{date} * {payee}\n    Expenses:Food    ${dollars}.00\n    Assets:Checking\n\n"
-    )
+    format!("{date} * {payee}\n    Expenses:Food    ${dollars}.00\n    Assets:Checking\n\n")
 }
 
 proptest! {

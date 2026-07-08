@@ -4,9 +4,11 @@ use indexmap::{IndexMap, IndexSet};
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::error::ParseError;
-use crate::model::{Account, Transaction};
-use crate::parser::{self, Directive, Entry};
+use crate::{
+    error::ParseError,
+    model::{Account, Transaction},
+    parser::{self, Directive, Entry},
+};
 
 #[derive(Debug, Error, Diagnostic)]
 pub enum JournalError {

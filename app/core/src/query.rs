@@ -65,8 +65,14 @@ mod tests {
     #[test]
     fn date_range_filter() {
         let t = txn(Date::new(2026, 1, 15).unwrap(), "X");
-        let q_before = Query { to: Some(Date::new(2026, 1, 14).unwrap()), ..Default::default() };
-        let q_after = Query { from: Some(Date::new(2026, 1, 16).unwrap()), ..Default::default() };
+        let q_before = Query {
+            to: Some(Date::new(2026, 1, 14).unwrap()),
+            ..Default::default()
+        };
+        let q_after = Query {
+            from: Some(Date::new(2026, 1, 16).unwrap()),
+            ..Default::default()
+        };
         let q_match = Query {
             from: Some(Date::new(2026, 1, 1).unwrap()),
             to: Some(Date::new(2026, 1, 31).unwrap()),
@@ -81,7 +87,10 @@ mod tests {
     fn account_prefix_filter() {
         let p_assets = posting("Assets:Checking");
         let p_exp = posting("Expenses:Food");
-        let q = Query { account: Some("Assets".to_string()), ..Default::default() };
+        let q = Query {
+            account: Some("Assets".to_string()),
+            ..Default::default()
+        };
         assert!(q.matches_posting(&p_assets));
         assert!(!q.matches_posting(&p_exp));
     }
@@ -89,7 +98,10 @@ mod tests {
     #[test]
     fn exact_account_match() {
         let p = posting("Assets:Checking");
-        let q = Query { account: Some("Assets:Checking".to_string()), ..Default::default() };
+        let q = Query {
+            account: Some("Assets:Checking".to_string()),
+            ..Default::default()
+        };
         assert!(q.matches_posting(&p));
     }
 }

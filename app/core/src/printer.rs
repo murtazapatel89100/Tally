@@ -1,7 +1,9 @@
 use rust_decimal::Decimal;
 
-use crate::journal::Journal;
-use crate::model::{Amount, CommodityPosition, Transaction};
+use crate::{
+    journal::Journal,
+    model::{Amount, CommodityPosition, Transaction},
+};
 
 pub fn print_journal(journal: &Journal) -> String {
     let mut out = String::new();
@@ -132,11 +134,15 @@ mod tests {
 
     #[test]
     fn roundtrip_via_parse() {
-        use crate::journal::Journal;
-        use crate::model::Transaction;
+        use crate::{journal::Journal, model::Transaction};
 
         fn strip_spans(txns: Vec<Transaction>) -> Vec<Transaction> {
-            txns.into_iter().map(|mut t| { t.source_span = None; t }).collect()
+            txns.into_iter()
+                .map(|mut t| {
+                    t.source_span = None;
+                    t
+                })
+                .collect()
         }
 
         let journal = Journal::parse_str(
@@ -145,6 +151,9 @@ mod tests {
         .unwrap();
         let printed = print_journal(&journal);
         let journal2 = Journal::parse_str(&printed).unwrap();
-        assert_eq!(strip_spans(journal.transactions), strip_spans(journal2.transactions));
+        assert_eq!(
+            strip_spans(journal.transactions),
+            strip_spans(journal2.transactions)
+        );
     }
 }

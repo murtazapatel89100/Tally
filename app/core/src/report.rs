@@ -4,10 +4,12 @@ use indexmap::IndexMap;
 use jiff::civil::Date;
 use rust_decimal::Decimal;
 
-use crate::journal::Journal;
-use crate::model::{Account, Amount, Commodity};
-use crate::printer::format_amount;
-use crate::query::Query;
+use crate::{
+    journal::Journal,
+    model::{Account, Amount, Commodity},
+    printer::format_amount,
+    query::Query,
+};
 
 pub struct BalRow {
     pub account: Account,
@@ -50,7 +52,9 @@ fn amtmap_to_vec(map: &AmountMap) -> Vec<Amount> {
 }
 
 fn amtmap_to_vec_all(map: &AmountMap) -> Vec<Amount> {
-    map.values().map(|(q, c)| Amount::new(*q, c.clone())).collect()
+    map.values()
+        .map(|(q, c)| Amount::new(*q, c.clone()))
+        .collect()
 }
 
 pub fn balance(journal: &Journal, query: &Query) -> BalReport {
@@ -96,7 +100,11 @@ pub fn balance(journal: &Journal, query: &Query) -> BalReport {
         }
         let acc = Account::parse(acc_str);
         let depth = acc.depth() - 1;
-        rows.push(BalRow { account: acc, amounts, depth });
+        rows.push(BalRow {
+            account: acc,
+            amounts,
+            depth,
+        });
     }
 
     let mut grand: AmountMap = IndexMap::new();
@@ -106,7 +114,10 @@ pub fn balance(journal: &Journal, query: &Query) -> BalReport {
         }
     }
 
-    BalReport { rows, totals: amtmap_to_vec(&grand) }
+    BalReport {
+        rows,
+        totals: amtmap_to_vec(&grand),
+    }
 }
 
 pub fn register(journal: &Journal, query: &Query) -> RegReport {
@@ -169,11 +180,7 @@ impl BalReport {
                     ));
                 } else {
                     let pad = " ".repeat(indent.len() + display.len());
-                    out.push_str(&format!(
-                        "{:>width$}  {pad}\n",
-                        amt_str,
-                        width = amt_width
-                    ));
+                    out.push_str(&format!("{:>width$}  {pad}\n", amt_str, width = amt_width));
                 }
             }
         }
@@ -257,7 +264,10 @@ mod tests {
             .iter()
             .find(|r| r.account.as_str() == "Assets:Checking")
             .unwrap();
-        assert_eq!(checking.amounts[0].quantity, rust_decimal_macros::dec!(4900.00));
+        assert_eq!(
+            checking.amounts[0].quantity,
+            rust_decimal_macros::dec!(4900.00)
+        );
     }
 
     #[test]
@@ -273,8 +283,15 @@ mod tests {
     #[test]
     fn balance_account_filter() {
         let j = sample();
-        let q = Query { account: Some("Assets".to_string()), ..Default::default() };
+        let q = Query {
+            account: Some("Assets".to_string()),
+            ..Default::default()
+        };
         let rep = balance(&j, &q);
-        assert!(rep.rows.iter().all(|r| r.account.as_str().starts_with("Assets")));
+        assert!(
+            rep.rows
+                .iter()
+                .all(|r| r.account.as_str().starts_with("Assets"))
+        );
     }
 }

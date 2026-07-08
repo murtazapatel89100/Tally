@@ -1,7 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use tally_core::journal::Journal;
-use tally_core::query::Query;
-use tally_core::report;
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use tally_core::{journal::Journal, query::Query, report};
 
 fn generate_journal(n: usize) -> String {
     let mut out = String::new();
@@ -64,5 +62,11 @@ fn bench_print(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, bench_parse, bench_balance_report, bench_register_report, bench_print);
+criterion_group!(
+    benches,
+    bench_parse,
+    bench_balance_report,
+    bench_register_report,
+    bench_print
+);
 criterion_main!(benches);

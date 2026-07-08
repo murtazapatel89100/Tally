@@ -21,7 +21,10 @@ fn balance_snapshot() {
 #[test]
 fn balance_assets_filter_snapshot() {
     let journal = sample_journal();
-    let q = Query { account: Some("Assets".to_string()), ..Default::default() };
+    let q = Query {
+        account: Some("Assets".to_string()),
+        ..Default::default()
+    };
     let rep = balance(&journal, &q);
     insta::assert_snapshot!("balance_assets", rep.render());
 }

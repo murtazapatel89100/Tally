@@ -3,8 +3,7 @@
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use tally_core::journal::Journal;
-use tally_core::model::Account;
+use tally_core::{journal::Journal, model::Account};
 
 fn sample() -> Journal {
     // The sample lives at app/examples/sample.journal; tests run from the crate

@@ -2,10 +2,12 @@ pub mod form;
 pub mod theme;
 pub mod ui;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    io,
+    path::PathBuf,
+    time::Duration,
+};
 
 use crossterm::{
     event::{
@@ -13,10 +15,15 @@ use crossterm::{
         MouseButton, MouseEvent, MouseEventKind,
     },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use form::{Focus, FormState};
 use miette::miette;
-use ratatui::{backend::CrosstermBackend, widgets::{ListState, TableState}, Terminal};
+use ratatui::{
+    Terminal,
+    backend::CrosstermBackend,
+    widgets::{ListState, TableState},
+};
 use rust_decimal::Decimal;
 use tally_core::{
     journal::Journal,
@@ -24,8 +31,6 @@ use tally_core::{
     query::Query,
     report::{self, BalReport, RegRow},
 };
-
-use form::{FormState, Focus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
@@ -144,7 +149,12 @@ fn compute_expense_bars(journal: &Journal) -> Vec<(String, u64)> {
         for p in &txn.postings {
             if p.account.top_level() == "Expenses" {
                 if let Some(a) = &p.amount {
-                    let cat = p.account.0.get(1).cloned().unwrap_or_else(|| "Other".to_string());
+                    let cat = p
+                        .account
+                        .0
+                        .get(1)
+                        .cloned()
+                        .unwrap_or_else(|| "Other".to_string());
                     *by_cat.entry(cat).or_insert(0) += decimal_cents(a.quantity).abs();
                 }
             }
@@ -188,7 +198,11 @@ fn compute_budget_progress(
             }
             let label = b.label.clone().unwrap_or_else(|| b.account.clone());
             let budget_cents = (b.monthly * 100.0) as i64;
-            BudgetProgress { label, spent_cents, budget_cents }
+            BudgetProgress {
+                label,
+                spent_cents,
+                budget_cents,
+            }
         })
         .collect()
 }
@@ -197,7 +211,12 @@ fn build_dash(journal: &Journal, config: &crate::config::TallyConfig) -> DashSta
     let (sparkline_data, sparkline_min_cents) = compute_sparkline(journal);
     let expense_bars = compute_expense_bars(journal);
     let budget_progress = compute_budget_progress(journal, &config.budgets);
-    DashState { sparkline_data, sparkline_min_cents, expense_bars, budget_progress }
+    DashState {
+        sparkline_data,
+        sparkline_min_cents,
+        expense_bars,
+        budget_progress,
+    }
 }
 
 impl App {
@@ -333,7 +352,11 @@ impl App {
                 if n == 0 {
                     return;
                 }
-                let i = self.bal.list_state.selected().map_or(0, |i| (i + 1).min(n - 1));
+                let i = self
+                    .bal
+                    .list_state
+                    .selected()
+                    .map_or(0, |i| (i + 1).min(n - 1));
                 self.bal.list_state.select(Some(i));
             }
             View::Register => {
@@ -341,7 +364,11 @@ impl App {
                 if n == 0 {
                     return;
                 }
-                let i = self.reg.table_state.selected().map_or(0, |i| (i + 1).min(n - 1));
+                let i = self
+                    .reg
+                    .table_state
+                    .selected()
+                    .map_or(0, |i| (i + 1).min(n - 1));
                 self.reg.table_state.select(Some(i));
             }
             View::Accounts => {
@@ -349,7 +376,11 @@ impl App {
                 if n == 0 {
                     return;
                 }
-                let i = self.acc.list_state.selected().map_or(0, |i| (i + 1).min(n - 1));
+                let i = self
+                    .acc
+                    .list_state
+                    .selected()
+                    .map_or(0, |i| (i + 1).min(n - 1));
                 self.acc.list_state.select(Some(i));
             }
         }
@@ -359,15 +390,27 @@ impl App {
         match self.view {
             View::Dashboard => {}
             View::Balances => {
-                let i = self.bal.list_state.selected().map_or(0, |i| i.saturating_sub(1));
+                let i = self
+                    .bal
+                    .list_state
+                    .selected()
+                    .map_or(0, |i| i.saturating_sub(1));
                 self.bal.list_state.select(Some(i));
             }
             View::Register => {
-                let i = self.reg.table_state.selected().map_or(0, |i| i.saturating_sub(1));
+                let i = self
+                    .reg
+                    .table_state
+                    .selected()
+                    .map_or(0, |i| i.saturating_sub(1));
                 self.reg.table_state.select(Some(i));
             }
             View::Accounts => {
-                let i = self.acc.list_state.selected().map_or(0, |i| i.saturating_sub(1));
+                let i = self
+                    .acc
+                    .list_state
+                    .selected()
+                    .map_or(0, |i| i.saturating_sub(1));
                 self.acc.list_state.select(Some(i));
             }
         }
@@ -434,25 +477,40 @@ impl App {
         let new_vis = compute_visible(&self.bal.report, &self.bal.collapsed);
         self.bal.visible = new_vis;
         let n = self.bal.visible.len();
-        self.bal.list_state.select(Some(vis_idx.min(n.saturating_sub(1))));
+        self.bal
+            .list_state
+            .select(Some(vis_idx.min(n.saturating_sub(1))));
     }
 
     pub fn drill_into_register(&mut self) {
         let acc = match self.view {
             View::Dashboard => return,
             View::Accounts => {
-                let vi = match self.acc.list_state.selected() { Some(i) => i, None => return };
-                let ai = match self.acc.filtered.get(vi) { Some(&i) => i, None => return };
+                let vi = match self.acc.list_state.selected() {
+                    Some(i) => i,
+                    None => return,
+                };
+                let ai = match self.acc.filtered.get(vi) {
+                    Some(&i) => i,
+                    None => return,
+                };
                 self.acc.all[ai].as_str()
             }
             View::Balances => {
-                let vi = match self.bal.list_state.selected() { Some(i) => i, None => return };
-                let ri = match self.bal.visible.get(vi) { Some(&i) => i, None => return };
+                let vi = match self.bal.list_state.selected() {
+                    Some(i) => i,
+                    None => return,
+                };
+                let ri = match self.bal.visible.get(vi) {
+                    Some(&i) => i,
+                    None => return,
+                };
                 self.bal.report.rows[ri].account.as_str()
             }
             View::Register => return,
         };
-        self.drill_stack.push((self.view, self.reg.account_filter.clone()));
+        self.drill_stack
+            .push((self.view, self.reg.account_filter.clone()));
         self.reg.account_filter = Some(acc);
         self.refresh_reg();
         self.view = View::Register;
@@ -518,13 +576,19 @@ impl App {
                 let fl = self.filter.to_lowercase();
                 let q = Query {
                     account: self.reg.account_filter.clone(),
-                    payee: if fl.is_empty() { None } else { Some(self.filter.clone()) },
+                    payee: if fl.is_empty() {
+                        None
+                    } else {
+                        Some(self.filter.clone())
+                    },
                     ..Default::default()
                 };
                 let rep = report::register(&self.journal, &q);
                 self.reg.rows = rep.rows;
                 let n = self.reg.rows.len();
-                self.reg.table_state.select(if n > 0 { Some(0) } else { None });
+                self.reg
+                    .table_state
+                    .select(if n > 0 { Some(0) } else { None });
             }
             View::Accounts => self.rebuild_acc(),
         }
@@ -533,7 +597,11 @@ impl App {
     fn rebuild_bal(&mut self) {
         let fl = self.filter.to_lowercase();
         let q = Query {
-            account: if fl.is_empty() { None } else { Some(self.filter.clone()) },
+            account: if fl.is_empty() {
+                None
+            } else {
+                Some(self.filter.clone())
+            },
             ..Default::default()
         };
         let rep = report::balance(&self.journal, &q);
@@ -541,7 +609,9 @@ impl App {
         let n = vis.len();
         self.bal.report = rep;
         self.bal.visible = vis;
-        self.bal.list_state.select(if n > 0 { Some(0) } else { None });
+        self.bal
+            .list_state
+            .select(if n > 0 { Some(0) } else { None });
     }
 
     fn rebuild_acc(&mut self) {
@@ -555,7 +625,9 @@ impl App {
             .map(|(i, _)| i)
             .collect();
         let n = self.acc.filtered.len();
-        self.acc.list_state.select(if n > 0 { Some(0) } else { None });
+        self.acc
+            .list_state
+            .select(if n > 0 { Some(0) } else { None });
     }
 
     fn refresh_reg(&mut self) {
@@ -566,7 +638,9 @@ impl App {
         let rep = report::register(&self.journal, &q);
         self.reg.rows = rep.rows;
         let n = self.reg.rows.len();
-        self.reg.table_state.select(if n > 0 { Some(0) } else { None });
+        self.reg
+            .table_state
+            .select(if n > 0 { Some(0) } else { None });
     }
 }
 
@@ -640,17 +714,27 @@ impl App {
         if self.view != View::Balances {
             return;
         }
-        let all: Vec<String> = self.bal.report.rows.iter().map(|r| r.account.as_str()).collect();
+        let all: Vec<String> = self
+            .bal
+            .report
+            .rows
+            .iter()
+            .map(|r| r.account.as_str())
+            .collect();
         self.bal.collapsed.clear();
         for s in &all {
-            let has_children = all.iter().any(|o| o != s && o.starts_with(&format!("{s}:")));
+            let has_children = all
+                .iter()
+                .any(|o| o != s && o.starts_with(&format!("{s}:")));
             if has_children {
                 self.bal.collapsed.insert(s.clone());
             }
         }
         self.bal.visible = compute_visible(&self.bal.report, &self.bal.collapsed);
         let n = self.bal.visible.len();
-        self.bal.list_state.select(if n > 0 { Some(0) } else { None });
+        self.bal
+            .list_state
+            .select(if n > 0 { Some(0) } else { None });
     }
 
     pub fn expand_all(&mut self) {
@@ -660,7 +744,9 @@ impl App {
         self.bal.collapsed.clear();
         self.bal.visible = compute_visible(&self.bal.report, &self.bal.collapsed);
         let n = self.bal.visible.len();
-        self.bal.list_state.select(if n > 0 { Some(0) } else { None });
+        self.bal
+            .list_state
+            .select(if n > 0 { Some(0) } else { None });
     }
 
     pub fn result_count(&self) -> usize {
@@ -719,7 +805,12 @@ pub fn run(
     let result = event_loop(&mut terminal, &mut app);
 
     disable_raw_mode().ok();
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture).ok();
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )
+    .ok();
     terminal.show_cursor().ok();
 
     result
@@ -730,7 +821,9 @@ fn event_loop<B: ratatui::backend::Backend>(
     app: &mut App,
 ) -> miette::Result<()> {
     loop {
-        terminal.draw(|f| ui::draw(f, app)).map_err(|e| miette!("{e}"))?;
+        terminal
+            .draw(|f| ui::draw(f, app))
+            .map_err(|e| miette!("{e}"))?;
 
         if event::poll(Duration::from_millis(200)).map_err(|e| miette!("{e}"))? {
             match event::read().map_err(|e| miette!("{e}"))? {
@@ -863,7 +956,9 @@ fn handle_form_key(app: &mut App, key: KeyEvent) -> bool {
         }
     }
 
-    let Some(form) = &mut app.form else { return true };
+    let Some(form) = &mut app.form else {
+        return true;
+    };
 
     match key.code {
         KeyCode::Esc => {
@@ -899,7 +994,9 @@ fn handle_form_key(app: &mut App, key: KeyEvent) -> bool {
         _ => {}
     }
 
-    let Some(form) = &mut app.form else { return true };
+    let Some(form) = &mut app.form else {
+        return true;
+    };
 
     if form.completion_open {
         match key.code {
@@ -952,8 +1049,8 @@ fn handle_form_key(app: &mut App, key: KeyEvent) -> bool {
             let accounts = app.acc.all.clone();
             if let Some(f) = &mut app.form {
                 f.update_completions(&accounts);
-                f.completion_open = !f.completions.is_empty()
-                    && !f.postings[i].account.text.is_empty();
+                f.completion_open =
+                    !f.completions.is_empty() && !f.postings[i].account.text.is_empty();
                 f.update_balance();
             }
             return true;

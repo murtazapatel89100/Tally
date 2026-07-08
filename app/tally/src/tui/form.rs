@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use std::fs;
-use std::io::Write as _;
-use std::path::Path;
+use std::{collections::HashMap, fs, io::Write as _, path::Path};
 
 use crossterm::event::KeyCode;
-use nucleo_matcher::{Config, Matcher, Utf32Str};
-use nucleo_matcher::pattern::{Atom, AtomKind, CaseMatching, Normalization};
+use nucleo_matcher::{
+    Config, Matcher, Utf32Str,
+    pattern::{Atom, AtomKind, CaseMatching, Normalization},
+};
 use rust_decimal::Decimal;
 use tally_core::{
     journal::Journal,
@@ -83,7 +82,9 @@ fn prev_boundary(s: &str, pos: usize) -> usize {
 }
 
 fn next_boundary(s: &str, pos: usize) -> usize {
-    (pos + 1..=s.len()).find(|&i| s.is_char_boundary(i)).unwrap_or(s.len())
+    (pos + 1..=s.len())
+        .find(|&i| s.is_char_boundary(i))
+        .unwrap_or(s.len())
 }
 
 #[derive(Debug, Default, Clone)]
@@ -289,8 +290,8 @@ impl FormState {
     }
 
     pub fn try_build(&self) -> Result<Transaction, String> {
-        let date =
-            parse_date(&self.date.text).ok_or_else(|| format!("invalid date '{}'", self.date.text))?;
+        let date = parse_date(&self.date.text)
+            .ok_or_else(|| format!("invalid date '{}'", self.date.text))?;
         let payee = self.payee.text.trim();
         if payee.is_empty() {
             return Err("payee is required".into());
@@ -330,7 +331,11 @@ impl FormState {
     }
 }
 
-pub fn save_and_reload(form: &FormState, txn: &Transaction, path: &Path) -> Result<Journal, String> {
+pub fn save_and_reload(
+    form: &FormState,
+    txn: &Transaction,
+    path: &Path,
+) -> Result<Journal, String> {
     let serialized = print_transaction(txn);
 
     match &form.mode {
@@ -340,7 +345,8 @@ pub fn save_and_reload(form: &FormState, txn: &Transaction, path: &Path) -> Resu
                 .open(path)
                 .map_err(|e| e.to_string())?;
             file.write_all(b"\n").map_err(|e| e.to_string())?;
-            file.write_all(serialized.as_bytes()).map_err(|e| e.to_string())?;
+            file.write_all(serialized.as_bytes())
+                .map_err(|e| e.to_string())?;
         }
         FormMode::Edit { span } => {
             let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -363,7 +369,13 @@ fn fuzzy_accounts(query: &str, accounts: &[Account]) -> Vec<String> {
     }
 
     let mut matcher = Matcher::new(Config::DEFAULT);
-    let atom = Atom::new(query, CaseMatching::Ignore, Normalization::Smart, AtomKind::Fuzzy, false);
+    let atom = Atom::new(
+        query,
+        CaseMatching::Ignore,
+        Normalization::Smart,
+        AtomKind::Fuzzy,
+        false,
+    );
 
     let mut scored: Vec<(u16, String)> = accounts
         .iter()

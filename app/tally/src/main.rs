@@ -4,7 +4,7 @@ mod tui;
 use std::path::PathBuf;
 
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use miette::miette;
 use tally_core::{
     journal::{Journal, JournalError},
@@ -120,8 +120,7 @@ fn main() -> miette::Result<()> {
 }
 
 fn load(file: Option<PathBuf>) -> miette::Result<Journal> {
-    let path =
-        file.ok_or_else(|| miette!("no journal file; use -f FILE or set $TALLY_FILE"))?;
+    let path = file.ok_or_else(|| miette!("no journal file; use -f FILE or set $TALLY_FILE"))?;
     Journal::from_path(&path).map_err(|e| match e {
         JournalError::Parse(pe) => miette::Report::new(pe),
         JournalError::Io { path, source } => miette!("cannot read '{path}': {source}"),
@@ -139,5 +138,10 @@ fn build_query(
     let to = to
         .map(|s| parse_date(&s).ok_or_else(|| miette!("invalid date '{s}'")))
         .transpose()?;
-    Ok(Query { account, from, to, ..Default::default() })
+    Ok(Query {
+        account,
+        from,
+        to,
+        ..Default::default()
+    })
 }

@@ -1,13 +1,17 @@
 use indexmap::IndexMap;
 use jiff::civil::Date;
 use rust_decimal::Decimal;
-use winnow::ascii::space0;
-use winnow::combinator::{alt, opt, preceded};
-use winnow::token::{one_of, take_while};
-use winnow::{ModalResult, Parser};
+use winnow::{
+    ModalResult, Parser,
+    ascii::space0,
+    combinator::{alt, opt, preceded},
+    token::{one_of, take_while},
+};
 
-use crate::error::ParseError;
-use crate::model::{Account, Amount, Commodity, Posting, SourceSpan, Status, Transaction};
+use crate::{
+    error::ParseError,
+    model::{Account, Amount, Commodity, Posting, SourceSpan, Status, Transaction},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Entry {
