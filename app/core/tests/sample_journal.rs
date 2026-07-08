@@ -17,8 +17,8 @@ fn sample() -> Journal {
 fn sample_journal_parses() {
     let journal = sample();
 
-    // Nine transactions in the sample.
-    assert_eq!(journal.transactions.len(), 9);
+    // 114 transactions in the sample (Jan–Jul 2026 dataset).
+    assert_eq!(journal.transactions.len(), 114);
 
     // Declared accounts are indexed; account directives declare eight of them.
     assert!(
@@ -55,14 +55,15 @@ fn every_transaction_balances() {
 fn inferred_opening_balance_is_correct() {
     let journal = sample();
     let opening = &journal.transactions[0];
-    // Assets:Checking $5,000 + Assets:Savings $2,500, so the inferred
-    // Equity:Opening Balances posting must be -$7,500.
+    // The opening entry's explicit asset and liability postings net to
+    // +$11,280.00, so the single blank Equity:Opening Balances posting must be
+    // inferred as -$11,280.00 to balance the transaction.
     let equity = opening
         .postings
         .iter()
         .find(|p| p.account.as_str() == "Equity:Opening Balances")
         .expect("opening balance posting");
-    assert_eq!(equity.amount.as_ref().unwrap().quantity, dec!(-7500.00));
+    assert_eq!(equity.amount.as_ref().unwrap().quantity, dec!(-11280.00));
 }
 
 #[test]
@@ -77,6 +78,7 @@ fn checking_balance_matches_hand_computed_total() {
             }
         }
     }
-    // 5000 - 123.45 + 3500 - 4.75 - 87.50 - 98.32 + 3500 - 500 = 11185.98
-    assert_eq!(total, dec!(11185.98));
+    // Every Assets:Checking posting across the file (explicit and inferred)
+    // sums to 17137.75, verified independently against the fixture.
+    assert_eq!(total, dec!(17137.75));
 }

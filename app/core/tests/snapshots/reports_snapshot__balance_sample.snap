@@ -2,18 +2,38 @@
 source: core/tests/reports_snapshot.rs
 expression: rep.render()
 ---
-$14,185.98  Assets
-$11,185.98    Checking
- $3,000.00    Savings
--$7,500.00  Equity
--$7,500.00    Opening Balances
-   $314.02  Expenses
-   $226.52    Food
-     $4.75      Coffee
-   $221.77      Groceries
-    $87.50    Utilities
-    $87.50      Electric
--$7,000.00  Income
--$7,000.00    Salary
-------------
-         0
+ $42,537.75  Assets
+ $17,137.75    Checking
+ $14,900.00    Investments
+  $1,800.00      Crypto
+ $13,100.00      ETF
+ $10,500.00    Savings
+-$11,280.00  Equity
+-$11,280.00    Opening Balances
+ $15,459.10  Expenses
+    $320.79    Entertainment
+    $118.00      Cinema
+    $202.79      Streaming
+  $2,079.12    Food
+     $45.50      Coffee
+    $386.50      Dining
+  $1,647.12      Groceries
+    $292.25    Health
+    $175.00      Gym
+    $117.25      Pharmacy
+ $11,100.00    Housing
+ $11,100.00      Rent
+    $670.00    Transport
+    $355.00      Gas
+    $315.00      PublicTransit
+    $996.94    Utilities
+    $517.00      Electric
+    $479.94      Internet
+-$34,400.00  Income
+ -$5,000.00    Freelance
+-$29,400.00    Salary
+-$12,316.85  Liabilities
+    $383.15    CreditCard
+-$12,700.00    StudentLoan
+-------------
+          0

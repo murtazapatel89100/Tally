@@ -2,8 +2,11 @@
 source: core/tests/reports_snapshot.rs
 expression: rep.render()
 ---
-$14,185.98  Assets
-$11,185.98    Checking
- $3,000.00    Savings
+$42,537.75  Assets
+$17,137.75    Checking
+$14,900.00    Investments
+ $1,800.00      Crypto
+$13,100.00      ETF
+$10,500.00    Savings
 ------------
-$14,185.98
+$42,537.75

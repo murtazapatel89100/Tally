@@ -2,7 +2,7 @@ pub mod form;
 pub mod theme;
 pub mod ui;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -17,6 +17,7 @@ use crossterm::{
 };
 use miette::miette;
 use ratatui::{backend::CrosstermBackend, widgets::{ListState, TableState}, Terminal};
+use rust_decimal::Decimal;
 use tally_core::{
     journal::Journal,
     model::Account,
@@ -28,9 +29,23 @@ use form::{FormState, Focus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
+    Dashboard,
     Balances,
     Register,
     Accounts,
+}
+
+pub struct BudgetProgress {
+    pub label: String,
+    pub spent_cents: i64,
+    pub budget_cents: i64,
+}
+
+pub struct DashState {
+    pub sparkline_data: Vec<u64>,
+    pub sparkline_min_cents: i64,
+    pub expense_bars: Vec<(String, u64)>,
+    pub budget_progress: Vec<BudgetProgress>,
 }
 
 pub struct BalState {
@@ -55,6 +70,7 @@ pub struct AccState {
 pub struct App {
     pub journal: Journal,
     pub journal_path: PathBuf,
+    pub config: crate::config::TallyConfig,
     pub view: View,
     pub filter: String,
     pub filtering: bool,
@@ -62,6 +78,7 @@ pub struct App {
     pub bal: BalState,
     pub reg: RegState,
     pub acc: AccState,
+    pub dash: DashState,
     pub drill_stack: Vec<(View, Option<String>)>,
     pub form: Option<FormState>,
     pub viewport_height: u16,
@@ -87,8 +104,104 @@ fn compute_visible(report: &BalReport, collapsed: &HashSet<String>) -> Vec<usize
         .collect()
 }
 
+fn decimal_cents(d: Decimal) -> i64 {
+    let s = (d * Decimal::from(100)).round().to_string();
+    s.parse().unwrap_or(0)
+}
+
+fn compute_sparkline(journal: &Journal) -> (Vec<u64>, i64) {
+    let mut running_cents: i64 = 0;
+    let mut monthly: BTreeMap<(i16, i8), i64> = BTreeMap::new();
+
+    for txn in &journal.transactions {
+        for p in &txn.postings {
+            let top = p.account.top_level();
+            if top == "Assets" || top == "Liabilities" {
+                if let Some(a) = &p.amount {
+                    running_cents += decimal_cents(a.quantity);
+                }
+            }
+        }
+        let key = (txn.date.year(), txn.date.month());
+        monthly.insert(key, running_cents);
+    }
+
+    if monthly.is_empty() {
+        return (vec![], 0);
+    }
+
+    let values: Vec<i64> = monthly.values().copied().collect();
+    let min_val = *values.iter().min().unwrap_or(&0);
+    let sparkline: Vec<u64> = values.iter().map(|v| (v - min_val) as u64).collect();
+
+    (sparkline, min_val)
+}
+
+fn compute_expense_bars(journal: &Journal) -> Vec<(String, u64)> {
+    let mut by_cat: BTreeMap<String, i64> = BTreeMap::new();
+
+    for txn in &journal.transactions {
+        for p in &txn.postings {
+            if p.account.top_level() == "Expenses" {
+                if let Some(a) = &p.amount {
+                    let cat = p.account.0.get(1).cloned().unwrap_or_else(|| "Other".to_string());
+                    *by_cat.entry(cat).or_insert(0) += decimal_cents(a.quantity).abs();
+                }
+            }
+        }
+    }
+
+    let mut bars: Vec<(String, u64)> = by_cat
+        .into_iter()
+        .filter(|(_, v)| *v > 0)
+        .map(|(k, v)| (k, v as u64))
+        .collect();
+
+    bars.sort_by_key(|b| std::cmp::Reverse(b.1));
+    bars.truncate(8);
+    bars
+}
+
+fn compute_budget_progress(
+    journal: &Journal,
+    budgets: &[crate::config::BudgetDef],
+) -> Vec<BudgetProgress> {
+    let today = jiff::Zoned::now().date();
+    let (y, m) = (today.year(), today.month());
+
+    budgets
+        .iter()
+        .map(|b| {
+            let mut spent_cents: i64 = 0;
+            for txn in &journal.transactions {
+                let (ty, tm) = (txn.date.year(), txn.date.month());
+                if (ty, tm) != (y, m) {
+                    continue;
+                }
+                for p in &txn.postings {
+                    if p.account.as_str().starts_with(&b.account) {
+                        if let Some(a) = &p.amount {
+                            spent_cents += decimal_cents(a.quantity).abs();
+                        }
+                    }
+                }
+            }
+            let label = b.label.clone().unwrap_or_else(|| b.account.clone());
+            let budget_cents = (b.monthly * 100.0) as i64;
+            BudgetProgress { label, spent_cents, budget_cents }
+        })
+        .collect()
+}
+
+fn build_dash(journal: &Journal, config: &crate::config::TallyConfig) -> DashState {
+    let (sparkline_data, sparkline_min_cents) = compute_sparkline(journal);
+    let expense_bars = compute_expense_bars(journal);
+    let budget_progress = compute_budget_progress(journal, &config.budgets);
+    DashState { sparkline_data, sparkline_min_cents, expense_bars, budget_progress }
+}
+
 impl App {
-    pub fn new(journal: Journal, path: PathBuf) -> Self {
+    pub fn new(journal: Journal, path: PathBuf, config: crate::config::TallyConfig) -> Self {
         let q = Query::default();
         let bal_report = report::balance(&journal, &q);
         let reg_report = report::register(&journal, &q);
@@ -110,10 +223,12 @@ impl App {
             acc_ls.select(Some(0));
         }
 
+        let dash = build_dash(&journal, &config);
+
         App {
             journal,
             journal_path: path,
-            view: View::Balances,
+            view: View::Dashboard,
             filter: String::new(),
             filtering: false,
             show_help: false,
@@ -133,6 +248,8 @@ impl App {
                 all: accounts,
                 list_state: acc_ls,
             },
+            dash,
+            config,
             drill_stack: Vec::new(),
             form: None,
             viewport_height: 0,
@@ -161,9 +278,19 @@ impl App {
         self.acc.filtered = (0..n).collect();
         self.acc.list_state.select(Some(0));
 
+        self.dash = build_dash(&self.journal, &self.config);
+
         self.drill_stack.clear();
         self.filter.clear();
         self.filtering = false;
+    }
+
+    pub fn current_theme(&self) -> &'static theme::Theme {
+        match self.config.theme.as_deref() {
+            Some("light") => &theme::LIGHT,
+            Some("nord") => &theme::NORD,
+            _ => &theme::TOKYO_NIGHT,
+        }
     }
 
     pub fn open_new_form(&mut self) {
@@ -200,6 +327,7 @@ impl App {
 
     pub fn scroll_down(&mut self) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => {
                 let n = self.bal.visible.len();
                 if n == 0 {
@@ -229,6 +357,7 @@ impl App {
 
     pub fn scroll_up(&mut self) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => {
                 let i = self.bal.list_state.selected().map_or(0, |i| i.saturating_sub(1));
                 self.bal.list_state.select(Some(i));
@@ -246,6 +375,7 @@ impl App {
 
     pub fn goto_top(&mut self) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => self.bal.list_state.select(Some(0)),
             View::Register => self.reg.table_state.select(Some(0)),
             View::Accounts => self.acc.list_state.select(Some(0)),
@@ -254,6 +384,7 @@ impl App {
 
     pub fn goto_bottom(&mut self) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => {
                 let n = self.bal.visible.len();
                 if n > 0 {
@@ -308,6 +439,7 @@ impl App {
 
     pub fn drill_into_register(&mut self) {
         let acc = match self.view {
+            View::Dashboard => return,
             View::Accounts => {
                 let vi = match self.acc.list_state.selected() { Some(i) => i, None => return };
                 let ai = match self.acc.filtered.get(vi) { Some(&i) => i, None => return };
@@ -380,6 +512,7 @@ impl App {
 
     fn apply_filter(&mut self) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => self.rebuild_bal(),
             View::Register => {
                 let fl = self.filter.to_lowercase();
@@ -440,6 +573,7 @@ impl App {
 impl App {
     fn current_len(&self) -> usize {
         match self.view {
+            View::Dashboard => 0,
             View::Balances => self.bal.visible.len(),
             View::Register => self.reg.rows.len(),
             View::Accounts => self.acc.filtered.len(),
@@ -448,6 +582,7 @@ impl App {
 
     fn selected_index(&self) -> Option<usize> {
         match self.view {
+            View::Dashboard => None,
             View::Balances => self.bal.list_state.selected(),
             View::Register => self.reg.table_state.selected(),
             View::Accounts => self.acc.list_state.selected(),
@@ -456,6 +591,7 @@ impl App {
 
     fn selected_offset(&self) -> usize {
         match self.view {
+            View::Dashboard => 0,
             View::Balances => self.bal.list_state.offset(),
             View::Register => self.reg.table_state.offset(),
             View::Accounts => self.acc.list_state.offset(),
@@ -464,6 +600,7 @@ impl App {
 
     fn set_selected(&mut self, i: usize) {
         match self.view {
+            View::Dashboard => {}
             View::Balances => self.bal.list_state.select(Some(i)),
             View::Register => self.reg.table_state.select(Some(i)),
             View::Accounts => self.acc.list_state.select(Some(i)),
@@ -532,7 +669,7 @@ impl App {
 
     pub fn net_worth(&self) -> String {
         use tally_core::model::{Amount, Commodity};
-        let mut totals: HashMap<String, (rust_decimal::Decimal, Commodity)> = HashMap::new();
+        let mut totals: HashMap<String, (Decimal, Commodity)> = HashMap::new();
         let mut order: Vec<String> = Vec::new();
         for txn in &self.journal.transactions {
             for p in &txn.postings {
@@ -545,7 +682,7 @@ impl App {
                         }
                         let e = totals
                             .entry(key)
-                            .or_insert_with(|| (rust_decimal::Decimal::ZERO, a.commodity.clone()));
+                            .or_insert_with(|| (Decimal::ZERO, a.commodity.clone()));
                         e.0 += a.quantity;
                     }
                 }
@@ -554,7 +691,7 @@ impl App {
         let parts: Vec<String> = order
             .iter()
             .filter_map(|k| totals.get(k))
-            .filter(|(q, _)| *q != rust_decimal::Decimal::ZERO)
+            .filter(|(q, _)| *q != Decimal::ZERO)
             .map(|(q, c)| tally_core::printer::format_amount(&Amount::new(*q, c.clone())))
             .collect();
         if parts.is_empty() {
@@ -565,7 +702,11 @@ impl App {
     }
 }
 
-pub fn run(journal: Journal, path: PathBuf) -> miette::Result<()> {
+pub fn run(
+    journal: Journal,
+    path: PathBuf,
+    config: crate::config::TallyConfig,
+) -> miette::Result<()> {
     install_panic_hook();
 
     enable_raw_mode().map_err(|e| miette!("terminal: {e}"))?;
@@ -574,7 +715,7 @@ pub fn run(journal: Journal, path: PathBuf) -> miette::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).map_err(|e| miette!("{e}"))?;
 
-    let mut app = App::new(journal, path);
+    let mut app = App::new(journal, path, config);
     let result = event_loop(&mut terminal, &mut app);
 
     disable_raw_mode().ok();
@@ -666,14 +807,16 @@ fn handle_key(app: &mut App, key: KeyEvent) -> bool {
         KeyCode::Char(']') => app.expand_all(),
         KeyCode::Char('g') => app.goto_top(),
         KeyCode::Char('G') => app.goto_bottom(),
-        KeyCode::Char('1') | KeyCode::Char('b') => app.switch_view(View::Balances),
-        KeyCode::Char('2') | KeyCode::Char('r') => app.switch_view(View::Register),
-        KeyCode::Char('3') | KeyCode::Char('a') => app.switch_view(View::Accounts),
+        KeyCode::Char('1') | KeyCode::Char('d') => app.switch_view(View::Dashboard),
+        KeyCode::Char('2') | KeyCode::Char('b') => app.switch_view(View::Balances),
+        KeyCode::Char('3') | KeyCode::Char('r') => app.switch_view(View::Register),
+        KeyCode::Char('4') | KeyCode::Char('a') => app.switch_view(View::Accounts),
         KeyCode::Tab => {
             let next = match app.view {
+                View::Dashboard => View::Balances,
                 View::Balances => View::Register,
                 View::Register => View::Accounts,
-                View::Accounts => View::Balances,
+                View::Accounts => View::Dashboard,
             };
             app.switch_view(next);
         }

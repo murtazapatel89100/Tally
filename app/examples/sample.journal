@@ -1,54 +1,495 @@
 ; sample.journal — Tally demo journal
-; Run once the CLI is built:
-;   tally bal   -f examples/sample.journal
-;   tally reg   -f examples/sample.journal
-;   tally print -f examples/sample.journal
+; Covers Jan–Jul 2026 with realistic personal finance data:
+; multiple account depths, income/expenses/liabilities, transfers.
 
 ; ── Account declarations ───────────────────────────────────────────────────────
 account Assets:Checking
 account Assets:Savings
+account Assets:Investments:ETF
+account Assets:Investments:Crypto
 account Liabilities:CreditCard
+account Liabilities:StudentLoan
 account Expenses:Food:Groceries
+account Expenses:Food:Dining
 account Expenses:Food:Coffee
 account Expenses:Utilities:Electric
+account Expenses:Utilities:Internet
+account Expenses:Transport:Gas
+account Expenses:Transport:PublicTransit
+account Expenses:Entertainment:Streaming
+account Expenses:Entertainment:Cinema
+account Expenses:Health:Gym
+account Expenses:Health:Pharmacy
+account Expenses:Housing:Rent
 account Income:Salary
+account Income:Freelance
 account Equity:Opening Balances
 
-; ── 2026-01 ───────────────────────────────────────────────────────────────────
+; ── Opening balances ──────────────────────────────────────────────────────────
 2026-01-01 * Opening Balances
-    Assets:Checking              $5,000.00
-    Assets:Savings               $2,500.00
+    Assets:Checking                $3,200.00
+    Assets:Savings                 $8,500.00
+    Assets:Investments:ETF         $12,400.00
+    Assets:Investments:Crypto      $1,800.00
+    Liabilities:CreditCard         $-420.00
+    Liabilities:StudentLoan        $-14,200.00
     Equity:Opening Balances
 
-2026-01-05 * (GS-001) Grocery Store      ; weekly shop
-    Expenses:Food:Groceries        $123.45
-    Assets:Checking
+; ── 2026-01 ───────────────────────────────────────────────────────────────────
+2026-01-15 * Employer                           ; monthly payroll
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
 
-2026-01-10 ! Electric Bill               ; pending clearance
-    Expenses:Utilities:Electric     $87.50
+2026-01-03 * Whole Foods Market
+    Expenses:Food:Groceries          $134.52
     Liabilities:CreditCard
 
-2026-01-15 * Employer                    ; ; payroll: monthly
-    Assets:Checking              $3,500.00
-    Income:Salary               -$3,500.00
+2026-01-06 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
 
-2026-01-20 * Blue Bottle Coffee
-    Expenses:Food:Coffee             $4.75
+2026-01-07 ! Pacific Gas & Electric             ; pending
+    Expenses:Utilities:Electric       $94.00
+    Liabilities:CreditCard
+
+2026-01-09 * Chipotle
+    Expenses:Food:Dining              $18.75
+    Assets:Checking
+
+2026-01-10 * Spotify + Netflix                  ; streaming bundle
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-01-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-01-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-01-17 * Whole Foods Market
+    Expenses:Food:Groceries          $112.30
+    Liabilities:CreditCard
+
+2026-01-20 * CVS Pharmacy
+    Expenses:Health:Pharmacy          $32.40
+    Assets:Checking
+
+2026-01-22 * Landlord                           ; ; category: housing
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-01-24 * Shell Gas Station
+    Expenses:Transport:Gas            $62.00
+    Assets:Checking
+
+2026-01-25 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-01-27 * Ramen House
+    Expenses:Food:Dining              $42.00
     Assets:Checking
 
 2026-01-28 * Credit Card Payment
-    Liabilities:CreditCard          $87.50
-    Assets:Checking               -$87.50
+    Liabilities:CreditCard           $700.00
+    Assets:Checking               $-700.00
+
+2026-01-29 * Transfer to Savings
+    Assets:Savings                   $500.00
+    Assets:Checking               $-500.00
+
+2026-01-30 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
 
 ; ── 2026-02 ───────────────────────────────────────────────────────────────────
-2026-02-01 * Grocery Store               ; ; category: essentials
-    Expenses:Food:Groceries        $98.32
+2026-02-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-02-01 * Whole Foods Market
+    Expenses:Food:Groceries          $128.90
+    Liabilities:CreditCard
+
+2026-02-03 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
     Assets:Checking
 
-2026-02-15 * Employer
-    Assets:Checking              $3,500.00
-    Income:Salary               -$3,500.00
+2026-02-06 * Pacific Gas & Electric
+    Expenses:Utilities:Electric       $88.00
+    Liabilities:CreditCard
 
-2026-02-18 * Transfer to Savings
-    Assets:Savings                 $500.00
-    Assets:Checking               -$500.00
+2026-02-07 * Freelance — Web Design             ; ; project: acme-redesign
+    Assets:Checking                  $900.00
+    Income:Freelance               $-900.00
+
+2026-02-10 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-02-11 * AMC Theatres
+    Expenses:Entertainment:Cinema     $32.00
+    Assets:Checking
+
+2026-02-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-02-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-02-16 * Whole Foods Market
+    Expenses:Food:Groceries           $98.15
+    Liabilities:CreditCard
+
+2026-02-18 * Chipotle
+    Expenses:Food:Dining              $21.50
+    Assets:Checking
+
+2026-02-20 * Landlord
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-02-22 * Shell Gas Station
+    Expenses:Transport:Gas            $58.00
+    Assets:Checking
+
+2026-02-24 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-02-26 * Credit Card Payment
+    Liabilities:CreditCard           $650.00
+    Assets:Checking               $-650.00
+
+2026-02-27 * Transfer to Savings
+    Assets:Savings                   $600.00
+    Assets:Checking               $-600.00
+
+2026-02-28 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
+
+; ── 2026-03 ───────────────────────────────────────────────────────────────────
+2026-03-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-03-01 * Whole Foods Market
+    Expenses:Food:Groceries          $143.70
+    Liabilities:CreditCard
+
+2026-03-05 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
+
+2026-03-06 * Pacific Gas & Electric
+    Expenses:Utilities:Electric       $76.00
+    Liabilities:CreditCard
+
+2026-03-08 * Sushi Place
+    Expenses:Food:Dining              $68.00
+    Assets:Checking
+
+2026-03-10 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-03-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-03-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-03-17 * Whole Foods Market
+    Expenses:Food:Groceries          $119.45
+    Liabilities:CreditCard
+
+2026-03-19 * Freelance — Logo Design
+    Assets:Checking                  $450.00
+    Income:Freelance               $-450.00
+
+2026-03-20 * Landlord
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-03-22 * Shell Gas Station
+    Expenses:Transport:Gas            $55.00
+    Assets:Checking
+
+2026-03-24 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-03-25 * CVS Pharmacy
+    Expenses:Health:Pharmacy          $18.90
+    Assets:Checking
+
+2026-03-26 * AMC Theatres
+    Expenses:Entertainment:Cinema     $28.00
+    Assets:Checking
+
+2026-03-28 * Credit Card Payment
+    Liabilities:CreditCard           $620.00
+    Assets:Checking               $-620.00
+
+2026-03-29 * Transfer to Investments
+    Assets:Investments:ETF           $300.00
+    Assets:Checking               $-300.00
+
+2026-03-31 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
+
+; ── 2026-04 ───────────────────────────────────────────────────────────────────
+2026-04-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-04-01 * Whole Foods Market
+    Expenses:Food:Groceries          $156.20
+    Liabilities:CreditCard
+
+2026-04-04 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
+
+2026-04-06 * Pacific Gas & Electric
+    Expenses:Utilities:Electric       $68.00
+    Liabilities:CreditCard
+
+2026-04-07 * Freelance — Content Writing
+    Assets:Checking                  $650.00
+    Income:Freelance               $-650.00
+
+2026-04-09 * Chipotle
+    Expenses:Food:Dining              $19.25
+    Assets:Checking
+
+2026-04-10 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-04-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-04-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-04-16 * Trader Joe's
+    Expenses:Food:Groceries           $89.35
+    Liabilities:CreditCard
+
+2026-04-19 * Italian Restaurant
+    Expenses:Food:Dining              $74.50
+    Assets:Checking
+
+2026-04-20 * Landlord
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-04-22 * Shell Gas Station
+    Expenses:Transport:Gas            $60.00
+    Assets:Checking
+
+2026-04-24 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-04-28 * Credit Card Payment
+    Liabilities:CreditCard           $580.00
+    Assets:Checking               $-580.00
+
+2026-04-29 * Transfer to Savings
+    Assets:Savings                   $400.00
+    Assets:Checking               $-400.00
+
+2026-04-30 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
+
+; ── 2026-05 ───────────────────────────────────────────────────────────────────
+2026-05-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-05-02 * Whole Foods Market
+    Expenses:Food:Groceries          $138.80
+    Liabilities:CreditCard
+
+2026-05-05 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
+
+2026-05-06 * Pacific Gas & Electric
+    Expenses:Utilities:Electric       $62.00
+    Liabilities:CreditCard
+
+2026-05-08 * Thai Restaurant
+    Expenses:Food:Dining              $38.00
+    Assets:Checking
+
+2026-05-10 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-05-11 * AMC Theatres
+    Expenses:Entertainment:Cinema     $36.00
+    Assets:Checking
+
+2026-05-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-05-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-05-16 * Whole Foods Market
+    Expenses:Food:Groceries          $104.60
+    Liabilities:CreditCard
+
+2026-05-20 * Landlord
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-05-22 * Shell Gas Station
+    Expenses:Transport:Gas            $57.00
+    Assets:Checking
+
+2026-05-24 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-05-26 * CVS Pharmacy
+    Expenses:Health:Pharmacy          $24.75
+    Assets:Checking
+
+2026-05-27 * Freelance — UI Audit
+    Assets:Checking                $1,200.00
+    Income:Freelance              $-1,200.00
+
+2026-05-28 * Credit Card Payment
+    Liabilities:CreditCard           $540.00
+    Assets:Checking               $-540.00
+
+2026-05-29 * Transfer to Investments
+    Assets:Investments:ETF           $400.00
+    Assets:Checking               $-400.00
+
+2026-05-31 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
+
+; ── 2026-06 ───────────────────────────────────────────────────────────────────
+2026-06-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-06-02 * Whole Foods Market
+    Expenses:Food:Groceries          $147.30
+    Liabilities:CreditCard
+
+2026-06-05 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
+
+2026-06-06 * Pacific Gas & Electric
+    Expenses:Utilities:Electric       $58.00
+    Liabilities:CreditCard
+
+2026-06-09 * Sushi Place
+    Expenses:Food:Dining              $82.00
+    Assets:Checking
+
+2026-06-10 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-06-12 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-06-14 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking
+
+2026-06-17 * Trader Joe's
+    Expenses:Food:Groceries          $111.45
+    Liabilities:CreditCard
+
+2026-06-19 * Freelance — React Dashboard
+    Assets:Checking                $1,800.00
+    Income:Freelance              $-1,800.00
+
+2026-06-20 * Landlord
+    Expenses:Housing:Rent          $1,850.00
+    Assets:Checking
+
+2026-06-22 * Shell Gas Station
+    Expenses:Transport:Gas            $63.00
+    Assets:Checking
+
+2026-06-24 * Comcast
+    Expenses:Utilities:Internet       $79.99
+    Liabilities:CreditCard
+
+2026-06-25 * AMC Theatres
+    Expenses:Entertainment:Cinema     $22.00
+    Assets:Checking
+
+2026-06-26 * CVS Pharmacy
+    Expenses:Health:Pharmacy          $41.20
+    Assets:Checking
+
+2026-06-28 * Credit Card Payment
+    Liabilities:CreditCard           $560.00
+    Assets:Checking               $-560.00
+
+2026-06-29 * Transfer to Savings
+    Assets:Savings                   $500.00
+    Assets:Checking               $-500.00
+
+2026-06-30 * Student Loan Payment
+    Liabilities:StudentLoan          $250.00
+    Assets:Checking               $-250.00
+
+; ── 2026-07 (current month) ───────────────────────────────────────────────────
+2026-07-15 * Employer
+    Assets:Checking                $4,200.00
+    Income:Salary                 $-4,200.00
+
+2026-07-01 * Whole Foods Market
+    Expenses:Food:Groceries          $162.40
+    Liabilities:CreditCard
+
+2026-07-03 * Blue Bottle Coffee
+    Expenses:Food:Coffee               $6.50
+    Assets:Checking
+
+2026-07-04 ! Pacific Gas & Electric             ; pending
+    Expenses:Utilities:Electric       $71.00
+    Liabilities:CreditCard
+
+2026-07-05 * Chipotle
+    Expenses:Food:Dining              $22.50
+    Assets:Checking
+
+2026-07-06 * Spotify + Netflix
+    Expenses:Entertainment:Streaming  $28.97
+    Liabilities:CreditCard
+
+2026-07-08 * Bay Area Rapid Transit
+    Expenses:Transport:PublicTransit  $45.00
+    Assets:Checking
+
+2026-07-10 * Planet Fitness
+    Expenses:Health:Gym               $25.00
+    Assets:Checking

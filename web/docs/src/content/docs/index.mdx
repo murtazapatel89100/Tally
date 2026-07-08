@@ -1,0 +1,123 @@
+---
+title: Tally — Plain-text accounting for the terminal
+description: Plain-text double-entry accounting for the terminal. ledger's data model, a genuinely pleasant TUI. Single binary, no dependencies, your data in a text file you own.
+template: splash
+head:
+  - tag: meta
+    attrs:
+      property: og:title
+      content: "Tally — Plain-text accounting for the terminal"
+  - tag: meta
+    attrs:
+      property: og:description
+      content: "Plain-text double-entry accounting for the terminal. ledger's data model, a genuinely pleasant TUI."
+  - tag: meta
+    attrs:
+      property: og:image
+      content: "https://tally.rs/og-image.png"
+  - tag: meta
+    attrs:
+      name: twitter:card
+      content: summary_large_image
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: "https://tally.rs/twitter-card.png"
+hero:
+  title: Plain-text accounting for the terminal
+  tagline: ledger's data model — a genuinely pleasant TUI. Single binary, no dependencies, your data in a text file you own.
+  image:
+    alt: Tally dashboard showing sparkline, expense bars, and budget gauges
+    file: ../../assets/logo-dark.png
+  actions:
+    - text: Get started
+      link: /install/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/murtazapatel89100/Tally
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why Tally?
+
+<CardGrid stagger>
+  <Card title="Compatible with ledger & hledger" icon="document">
+    Open your existing journal file unchanged. Tally parses the same format you already use.
+  </Card>
+  <Card title="First-class TUI" icon="laptop">
+    Browse balances, drill into accounts, and view the register — all without leaving the terminal.
+  </Card>
+  <Card title="In-app transaction entry" icon="pencil">
+    Add and edit transactions with fuzzy account autocomplete and live balance validation. No editor juggling.
+  </Card>
+  <Card title="Visual reporting" icon="chart">
+    Net-worth sparkline, expense bar charts, and budget gauges — all in the terminal.
+  </Card>
+  <Card title="Exact money arithmetic" icon="approve-check">
+    Decimal, never float. Every cent accounted for.
+  </Card>
+  <Card title="Single binary" icon="rocket">
+    One self-contained Rust binary. Fast startup, no runtime, no config required.
+  </Card>
+</CardGrid>
+
+## Dashboard
+
+The dashboard gives you a financial snapshot at a glance: a sparkline of net worth over time, a bar chart of top expense categories, and budget gauges for the current month.
+
+![Tally dashboard view showing net-worth sparkline, expense bar chart, and budget progress gauges](/screenshots/ss-dashboard.png)
+
+## Balances
+
+Drill into your account tree. Assets appear in teal, expenses in amber. Collapse and expand any node with `[` / `]`.
+
+![Tally balances view with collapsible account tree](/screenshots/ss-balances.png)
+
+## Register
+
+Browse every posting with running balance. Filter by account or payee with `/`. Amounts are coloured by sign — green for inflows, red for outflows.
+
+![Tally register view with colour-coded amounts and running balance](/screenshots/ss-register.png)
+
+## In-app entry
+
+Press `n` to open the transaction form. Account names autocomplete as you type, and the form validates that postings balance before saving.
+
+![Tally transaction entry form with autocomplete and balance indicator](/screenshots/ss-entry.png)
+
+## Quick start
+
+```sh
+# Install from crates.io (once published)
+cargo install tally
+
+# Point at your journal
+export TALLY_FILE=~/finance/2026.journal
+
+# Open the TUI
+tally
+
+# Or run CLI reports
+tally bal
+tally reg
+tally accounts
+tally print
+```
+
+## Key bindings at a glance
+
+| Key | Action |
+|-----|--------|
+| `1` / `d` | Dashboard |
+| `2` / `b` | Balances |
+| `3` / `r` | Register |
+| `4` / `a` | Accounts |
+| `Tab` | Cycle views |
+| `n` | New transaction |
+| `e` | Edit selected (Register) |
+| `/` | Filter |
+| `Enter` | Drill into register |
+| `q` | Quit |

@@ -1,3 +1,4 @@
+mod config;
 mod tui;
 
 use std::path::PathBuf;
@@ -69,14 +70,18 @@ fn main() -> miette::Result<()> {
         .file
         .or_else(|| std::env::var("LEDGER_FILE").ok().map(PathBuf::from));
 
+    let cfg = config::TallyConfig::load();
+
     match cli.command {
         None => {
-            let path = file.ok_or_else(|| miette!("no journal file; use -f FILE or set $TALLY_FILE"))?;
+            let path = file
+                .or_else(|| cfg.file.clone())
+                .ok_or_else(|| miette!("no journal file; use -f FILE or set $TALLY_FILE"))?;
             let journal = Journal::from_path(&path).map_err(|e| match e {
                 JournalError::Parse(pe) => miette::Report::new(pe),
                 JournalError::Io { path, source } => miette!("cannot read '{path}': {source}"),
             })?;
-            tui::run(journal, path)?;
+            tui::run(journal, path, cfg)?;
         }
 
         Some(Command::Accounts) => {

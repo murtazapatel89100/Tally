@@ -136,7 +136,7 @@ impl FormState {
             .map(|p| PostingRow {
                 account: TextInput::with_text(p.account.as_str()),
                 amount: TextInput::with_text(
-                    p.amount.as_ref().map(|a| format_amount(a)).unwrap_or_default(),
+                    p.amount.as_ref().map(format_amount).unwrap_or_default(),
                 ),
             })
             .collect();
@@ -379,6 +379,6 @@ fn fuzzy_accounts(query: &str, accounts: &[Account]) -> Vec<String> {
         })
         .collect();
 
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|&(sc, _)| std::cmp::Reverse(sc));
     scored.into_iter().take(8).map(|(_, s)| s).collect()
 }

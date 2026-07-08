@@ -2,6 +2,15 @@
 members = ["core", "tally"]
 resolver = "2"
 
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Murtaza Patel"]
+license = "MIT"
+repository = "https://github.com/murtazapatel89100/Tally"
+homepage = "https://tally.rs"
+rust-version = "1.85"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

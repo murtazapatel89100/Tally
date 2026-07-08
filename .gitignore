@@ -1,1 +1,11 @@
+# Rust
 /app/target/
+
+# Node / web build artifacts (lockfiles are kept)
+web/**/node_modules/
+web/**/dist/
+web/**/.astro/
+
+# Editor / OS
+.DS_Store
+*.swp

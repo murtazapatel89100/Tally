@@ -3,27 +3,31 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table},
+    widgets::{
+        Bar, BarChart, BarGroup, Block, BorderType, Borders, Cell, Clear, Gauge, List, ListItem,
+        Paragraph, Row, Sparkline, Table,
+    },
 };
 use rust_decimal::Decimal;
 use tally_core::printer::format_amount;
 
 use super::form::{Focus, FormState};
-use super::theme::{Theme, NORD};
+use super::theme::Theme;
 use super::{App, View};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
-    let t = &NORD;
+    let t = app.current_theme();
     let area = f.area();
     f.render_widget(Block::default().style(t.base()), area);
 
+    // title(1) + tabs+separator(2) + body(min) + footer(1)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // title
-            Constraint::Length(1), // tabs
-            Constraint::Min(0),    // body
-            Constraint::Length(1), // footer
+            Constraint::Length(1),
+            Constraint::Length(2),
+            Constraint::Min(0),
+            Constraint::Length(1),
         ])
         .split(area);
 
@@ -31,9 +35,10 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_tabs(f, chunks[1], app, t);
 
     match app.view {
-        View::Balances => draw_balances(f, chunks[2], app, t),
-        View::Register => draw_register(f, chunks[2], app, t),
-        View::Accounts => draw_accounts(f, chunks[2], app, t),
+        View::Dashboard => draw_dashboard(f, chunks[2], app, t),
+        View::Balances  => draw_balances(f, chunks[2], app, t),
+        View::Register  => draw_register(f, chunks[2], app, t),
+        View::Accounts  => draw_accounts(f, chunks[2], app, t),
     }
 
     draw_footer(f, chunks[3], app, t);
@@ -41,11 +46,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     if app.show_help {
         draw_help(f, area, t);
     }
-
     if let Some(form) = &mut app.form {
         draw_form(f, area, form, t);
     }
 }
+
+// ── Title bar ─────────────────────────────────────────────────────────────────
 
 fn draw_title(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
     let file = app
@@ -60,46 +66,46 @@ fn draw_title(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
     } else {
         Style::default().fg(t.positive).add_modifier(Modifier::BOLD)
     };
-
     let spans = vec![
+        Span::styled("  tally", Style::default().fg(t.accent).add_modifier(Modifier::BOLD)),
+        Span::styled("  —  ", Style::default().fg(t.border)),
+        Span::styled(file.to_string(), Style::default().fg(t.text)),
         Span::styled(
-            " Tally ",
-            Style::default().bg(t.accent).fg(t.bg).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!(" {file}"),
-            Style::default().fg(t.text).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(format!("  ·  {txns} txns"), Style::default().fg(t.subtle)),
-        Span::styled(
-            format!("  ·  {} accounts", app.acc.all.len()),
+            format!("   {txns} txns · {} accounts · net ", app.acc.all.len()),
             Style::default().fg(t.subtle),
         ),
-        Span::styled("  ·  net ", Style::default().fg(t.subtle)),
         Span::styled(net, net_style),
     ];
     f.render_widget(Paragraph::new(Line::from(spans)).style(t.base()), area);
 }
 
+// ── Tab bar + separator ───────────────────────────────────────────────────────
+
 fn draw_tabs(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
-    let mut spans = vec![Span::raw(" ")];
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(area);
+
+    let mut spans: Vec<Span> = vec![Span::raw("  ")];
     for (i, (label, view)) in [
-        ("1 Balances", View::Balances),
-        ("2 Register", View::Register),
-        ("3 Accounts", View::Accounts),
+        ("1 Dashboard", View::Dashboard),
+        ("2 Balances",  View::Balances),
+        ("3 Register",  View::Register),
+        ("4 Accounts",  View::Accounts),
     ]
     .iter()
     .enumerate()
     {
         if i > 0 {
-            spans.push(Span::raw(" "));
+            spans.push(Span::raw("  "));
         }
         if app.view == *view {
             spans.push(Span::styled(
                 format!(" {label} "),
                 Style::default()
                     .bg(t.selection_bg)
-                    .fg(t.selection_fg)
+                    .fg(t.text)
                     .add_modifier(Modifier::BOLD),
             ));
         } else {
@@ -110,7 +116,10 @@ fn draw_tabs(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
     if !app.drill_stack.is_empty()
         && let Some(acc) = &app.reg.account_filter
     {
-        spans.push(Span::styled(format!("  ▸ {acc}"), Style::default().fg(t.positive)));
+        spans.push(Span::styled(
+            format!("   ▸ {acc}"),
+            Style::default().fg(t.asset_amt),
+        ));
     }
 
     if app.filtering || !app.filter.is_empty() {
@@ -130,44 +139,55 @@ fn draw_tabs(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
         }
     }
 
-    f.render_widget(Paragraph::new(Line::from(spans)).style(t.base()), area);
+    f.render_widget(Paragraph::new(Line::from(spans)).style(t.base()), rows[0]);
+
+    // Thin separator line
+    f.render_widget(
+        Paragraph::new(Span::styled(
+            "─".repeat(area.width as usize),
+            Style::default().fg(t.border),
+        ))
+        .style(t.base()),
+        rows[1],
+    );
 }
+
+// ── Footer ────────────────────────────────────────────────────────────────────
 
 fn draw_footer(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
     let pairs: &[(&str, &str)] = if app.filtering {
         &[("Enter", "confirm"), ("Esc", "cancel")]
+    } else if app.view == View::Dashboard {
+        &[("Tab", "next view"), ("1-4", "switch"), ("n", "new"), ("?", "help"), ("q", "quit")]
     } else {
         &[
             ("j/k", "move"),
+            ("h/l", "collapse/expand"),
             ("/", "filter"),
             ("Enter", "drill"),
             ("u", "back"),
             ("n", "new"),
             ("e", "edit"),
-            ("Space", "collapse"),
-            ("[ ]", "all"),
             ("?", "help"),
             ("q", "quit"),
         ]
     };
-
-    let mut spans = vec![Span::raw(" ")];
+    let mut spans = vec![Span::raw("  ")];
     for (i, (k, d)) in pairs.iter().enumerate() {
         if i > 0 {
-            spans.push(Span::raw("   "));
+            spans.push(Span::styled("   ", Style::default().fg(t.subtle)));
         }
         spans.push(t.key(k));
-        spans.push(Span::raw(" "));
+        spans.push(Span::styled(": ", Style::default().fg(t.subtle)));
         spans.push(t.desc(d));
     }
     f.render_widget(Paragraph::new(Line::from(spans)).style(t.base()), area);
 }
 
-fn draw_balances(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
-    let block = t.block(" Balances ");
-    let inner = block.inner(area);
-    f.render_widget(block, area);
+// ── Balances — borderless, account-type coloring ─────────────────────────────
 
+fn draw_balances(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
+    let inner = h_padded(area, 2);
     app.viewport_height = inner.height;
     app.list_top = inner.y;
 
@@ -189,7 +209,7 @@ fn draw_balances(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
                 s != acc_str && s.starts_with(&format!("{acc_str}:"))
             });
             let marker = if has_children {
-                if app.bal.collapsed.contains(&acc_str) { "▸" } else { "▾" }
+                if app.bal.collapsed.contains(&acc_str) { "▸" } else { "▼" }
             } else {
                 "•"
             };
@@ -201,13 +221,13 @@ fn draw_balances(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
             let qty = row.amounts.first().map(|a| a.quantity).unwrap_or(Decimal::ZERO);
 
             let name_style = if row.depth == 0 {
-                Style::default().fg(t.selection_fg).add_modifier(Modifier::BOLD)
-            } else if row.depth == 1 {
-                Style::default().fg(t.text)
+                Style::default().fg(t.text).add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(t.subtle)
+                Style::default().fg(t.text)
             };
-            let mut amt_style = t.amount_style(qty);
+            // Account-type coloring: Assets→teal, Expenses→amber
+            let top = row.account.top_level();
+            let mut amt_style = t.account_amount_style(top, qty);
             if row.depth == 0 {
                 amt_style = amt_style.add_modifier(Modifier::BOLD);
             }
@@ -227,15 +247,10 @@ fn draw_balances(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
     f.render_stateful_widget(list, inner, &mut app.bal.list_state);
 }
 
-fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
-    let title = match &app.reg.account_filter {
-        Some(acc) => format!(" Register — {acc} "),
-        None => " Register ".to_string(),
-    };
-    let block = t.block(&title);
-    let inner = block.inner(area);
-    f.render_widget(block, area);
+// ── Register — borderless, sign-based coloring, "+" prefix ───────────────────
 
+fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
+    let inner = h_padded(area, 2);
     app.viewport_height = inner.height.saturating_sub(1);
     app.list_top = inner.y + 1;
 
@@ -244,14 +259,15 @@ fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
         return;
     }
 
-    let header = Row::new(["Date", "Payee", "Account", "Amount", "Balance"]).style(
-        Style::default()
-            .fg(t.header)
-            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-    );
+    // Column headers styled in running/teal (matching register image)
+    let header = Row::new([
+        "Date", "Payee", "Account", "Amount", "Balance",
+    ])
+    .style(Style::default().fg(t.running).add_modifier(Modifier::BOLD));
 
     let mut group = 0usize;
     let mut last_txn: Option<usize> = None;
+
     let rows: Vec<Row> = app
         .reg
         .rows
@@ -259,20 +275,24 @@ fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
         .map(|row| {
             let same = last_txn == Some(row.txn_idx);
             if !same {
-                if last_txn.is_some() {
-                    group += 1;
-                }
+                if last_txn.is_some() { group += 1; }
                 last_txn = Some(row.txn_idx);
             }
 
-            let date = if same { String::new() } else { row.date.to_string() };
-            let payee = if same { String::new() } else { trunc(&row.payee, 20) };
+            let date    = if same { String::new() } else { row.date.to_string() };
+            let payee   = if same { String::new() } else { trunc(&row.payee, 20) };
             let account = trunc(&row.account.as_str(), 22);
-            let amt = row.amount.as_ref().map(format_amount).unwrap_or_default();
+
+            // "+" prefix on positive amounts
+            let amt = row.amount.as_ref().map(format_signed_amount).unwrap_or_default();
             let amt_qty = row.amount.as_ref().map(|a| a.quantity).unwrap_or(Decimal::ZERO);
+
             let bal_amt = row.running.first();
-            let bal = bal_amt.map(format_amount).unwrap_or_else(|| "0".into());
+            let bal     = bal_amt.map(format_amount).unwrap_or_else(|| "0".into());
             let bal_neg = bal_amt.map(|a| a.quantity < Decimal::ZERO).unwrap_or(false);
+
+            // Sign-based coloring for Amount; running (teal) always for Balance
+            let amt_style = t.amount_style(amt_qty);
             let bal_style = Style::default().fg(if bal_neg { t.negative } else { t.running });
 
             let row_bg = if group % 2 == 1 {
@@ -285,7 +305,7 @@ fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
                 Cell::from(date).style(Style::default().fg(t.subtle)),
                 Cell::from(payee).style(Style::default().fg(t.text)),
                 Cell::from(account).style(Style::default().fg(t.subtle)),
-                Cell::from(Text::from(amt).right_aligned()).style(t.amount_style(amt_qty)),
+                Cell::from(Text::from(amt).right_aligned()).style(amt_style),
                 Cell::from(Text::from(bal).right_aligned()).style(bal_style),
             ])
             .style(row_bg)
@@ -306,11 +326,10 @@ fn draw_register(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
     f.render_stateful_widget(table, inner, &mut app.reg.table_state);
 }
 
-fn draw_accounts(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
-    let block = t.block(" Accounts ");
-    let inner = block.inner(area);
-    f.render_widget(block, area);
+// ── Accounts — borderless ─────────────────────────────────────────────────────
 
+fn draw_accounts(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
+    let inner = h_padded(area, 2);
     app.viewport_height = inner.height;
     app.list_top = inner.y;
 
@@ -334,6 +353,178 @@ fn draw_accounts(f: &mut Frame, area: Rect, app: &mut App, t: &Theme) {
     f.render_stateful_widget(list, inner, &mut app.acc.list_state);
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+fn draw_dashboard(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
+    let has_budgets = !app.dash.budget_progress.is_empty();
+    let budget_h = if has_budgets {
+        (app.dash.budget_progress.len() as u16 * 3 + 2).min(14)
+    } else {
+        3
+    };
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(budget_h)])
+        .split(area);
+
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(rows[0]);
+
+    draw_sparkline(f, cols[0], app, t);
+    draw_expense_bars(f, cols[1], app, t);
+    draw_budgets(f, rows[1], app, t);
+}
+
+fn draw_sparkline(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
+    let block = t.block(" Net Worth Trend ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if app.dash.sparkline_data.is_empty() {
+        draw_empty(f, inner, t, "No Assets / Liabilities data".to_string());
+        return;
+    }
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(0)])
+        .split(inner);
+
+    let current_cents = app.dash.sparkline_min_cents
+        + *app.dash.sparkline_data.last().unwrap_or(&0) as i64;
+    let current_str = format_dollars(current_cents);
+    let val_style = if current_cents >= 0 {
+        Style::default().fg(t.asset_amt).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(t.negative).add_modifier(Modifier::BOLD)
+    };
+
+    let label_lines = vec![
+        Line::from(Span::styled(
+            format!("  {current_str}"),
+            val_style,
+        )),
+        Line::from(Span::styled(
+            "  Current Net Worth",
+            Style::default().fg(t.subtle),
+        )),
+    ];
+    f.render_widget(Paragraph::new(label_lines).style(t.base()), chunks[0]);
+
+    // Sparkline bars in amber (matching dashboard image)
+    let sparkline = Sparkline::default()
+        .data(app.dash.sparkline_data.iter().copied())
+        .style(Style::default().fg(t.expense_amt).bg(t.bg));
+    f.render_widget(sparkline, chunks[1]);
+}
+
+fn draw_expense_bars(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
+    let block = t.block(" Expenses by Category ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if app.dash.expense_bars.is_empty() {
+        draw_empty(f, inner, t, "No expense data".to_string());
+        return;
+    }
+
+    // Bars in teal/asset_amt (matching dashboard image)
+    let bars: Vec<Bar<'_>> = app
+        .dash
+        .expense_bars
+        .iter()
+        .map(|(label, cents)| {
+            Bar::default()
+                .value(cents / 100)
+                .label(Line::from(label.as_str()))
+                .style(Style::default().fg(t.asset_amt))
+                .value_style(
+                    Style::default().fg(t.bg).bg(t.asset_amt).add_modifier(Modifier::BOLD),
+                )
+        })
+        .collect();
+
+    let group = BarGroup::default().bars(&bars);
+    let bar_w = if inner.width > 0 {
+        ((inner.width as usize).saturating_sub(1)
+            / (app.dash.expense_bars.len() * 2).max(1))
+        .clamp(3, 9) as u16
+    } else {
+        5
+    };
+
+    let chart = BarChart::default()
+        .data(group)
+        .bar_width(bar_w)
+        .bar_gap(1)
+        .style(t.base());
+    f.render_widget(chart, inner);
+}
+
+fn draw_budgets(f: &mut Frame, area: Rect, app: &App, t: &Theme) {
+    let block = t.block(" Budgets ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if app.dash.budget_progress.is_empty() {
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                " No budgets — add [[budgets]] entries to tally.toml",
+                Style::default().fg(t.subtle),
+            ))
+            .style(t.base()),
+            inner,
+        );
+        return;
+    }
+
+    let n = app.dash.budget_progress.len();
+    let constraints: Vec<Constraint> = (0..n).map(|_| Constraint::Length(3)).collect();
+    let rows_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    for (budget, row_area) in app.dash.budget_progress.iter().zip(rows_layout.iter()) {
+        let ratio = if budget.budget_cents > 0 {
+            (budget.spent_cents as f64 / budget.budget_cents as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let color = if ratio >= 1.0 {
+            t.negative
+        } else if ratio >= 0.8 {
+            t.expense_amt
+        } else {
+            t.positive  // bright green for healthy budget (matches image)
+        };
+        let title = format!(
+            " {} — {} / {} ({:.0}%)",
+            budget.label,
+            format_dollars(budget.spent_cents),
+            format_dollars(budget.budget_cents),
+            ratio * 100.0,
+        );
+        let gauge = Gauge::default()
+            .block(
+                Block::default()
+                    .title(Span::styled(title, Style::default().fg(t.text)))
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(t.border))
+                    .style(t.base()),
+            )
+            .gauge_style(Style::default().fg(color).bg(t.surface))
+            .ratio(ratio);
+        f.render_widget(gauge, *row_area);
+    }
+}
+
+// ── Transaction entry form ────────────────────────────────────────────────────
+
 fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
     let popup = form_rect(area);
     f.render_widget(Clear, popup);
@@ -351,7 +542,7 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
         .constraints([
             Constraint::Length(3), // date + status
             Constraint::Length(3), // payee
-            Constraint::Length(1), // postings label
+            Constraint::Length(1), // "Postings" label + column headers
             Constraint::Min(2),    // posting rows
             Constraint::Length(1), // balance bar
             Constraint::Length(1), // error
@@ -360,21 +551,22 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
         .margin(1)
         .split(inner);
 
+    // Date + Status
     let top_cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(16), Constraint::Min(0)])
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(rows[0]);
 
     render_input(f, top_cols[0], &form.date, form.focus == Focus::Date, "Date", t);
 
     let status_text = match form.status {
         tally_core::model::Status::Uncleared => "  Uncleared",
-        tally_core::model::Status::Cleared => "* Cleared",
-        tally_core::model::Status::Pending => "! Pending",
+        tally_core::model::Status::Cleared   => "* Cleared",
+        tally_core::model::Status::Pending   => "! Pending",
     };
     let status_focused = form.focus == Focus::Status;
     let (sb, st) = if status_focused {
-        (t.border_focus, t.accent)
+        (t.border_focus, t.border_focus)
     } else {
         (t.border, t.subtle)
     };
@@ -393,11 +585,25 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
 
     render_input(f, rows[1], &form.payee, form.focus == Focus::Payee, "Payee", t);
 
+    // "Postings  Account  Amount" column header line
+    let hdr_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(4), Constraint::Min(0), Constraint::Length(16)])
+        .split(rows[2]);
     f.render_widget(
-        Paragraph::new(" Postings").style(Style::default().fg(t.header).bg(t.bg)),
-        rows[2],
+        Paragraph::new(Span::styled("    ", Style::default())).style(t.base()),
+        hdr_cols[0],
+    );
+    f.render_widget(
+        Paragraph::new(Span::styled("Account", Style::default().fg(t.subtle))).style(t.base()),
+        hdr_cols[1],
+    );
+    f.render_widget(
+        Paragraph::new(Span::styled("Amount", Style::default().fg(t.subtle))).style(t.base()),
+        hdr_cols[2],
     );
 
+    // Posting rows (numbered: 1. 2. …)
     let posting_area = rows[3];
     let n = form.postings.len().min(6);
     let constraints: Vec<Constraint> = (0..n).map(|_| Constraint::Length(3)).collect();
@@ -409,21 +615,46 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
 
         let mut ac_popup: Option<Rect> = None;
         for (i, row_area) in posting_rows.iter().enumerate() {
-            if i >= form.postings.len() {
-                break;
-            }
-            let cols = Layout::default()
+            if i >= form.postings.len() { break; }
+
+            // Row number label on the left (3 cols)
+            let row_cols = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Min(0), Constraint::Length(16)])
+                .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(16)])
                 .split(*row_area);
+
+            let num_area = row_cols[0];
+            let v = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(1), Constraint::Min(0)])
+                .split(num_area);
+            f.render_widget(
+                Paragraph::new(Span::styled(
+                    format!("{}.", i + 1),
+                    Style::default().fg(t.subtle),
+                ))
+                .style(t.base()),
+                v[1],
+            );
 
             let acc_focused = form.focus == Focus::PostingAccount(i);
             let amt_focused = form.focus == Focus::PostingAmount(i);
-            render_input(f, cols[0], &form.postings[i].account, acc_focused, "Account", t);
-            render_input(f, cols[1], &form.postings[i].amount, amt_focused, "Amount", t);
+
+            // Show "(inferred)" when amount is blank and account is filled
+            let amt_text = &form.postings[i].amount.text;
+            let show_inferred = amt_text.is_empty()
+                && !form.postings[i].account.text.is_empty()
+                && form.postings.iter().filter(|p| p.amount.text.is_empty()).count() == 1;
+
+            if show_inferred && !amt_focused {
+                render_input_placeholder(f, row_cols[2], "(inferred)", t);
+            } else {
+                render_input(f, row_cols[2], &form.postings[i].amount, amt_focused, "Amount", t);
+            }
+            render_input(f, row_cols[1], &form.postings[i].account, acc_focused, "Account", t);
 
             if acc_focused && form.completion_open && !form.completions.is_empty() {
-                ac_popup = Some(cols[0]);
+                ac_popup = Some(row_cols[1]);
             }
         }
         if let Some(acc_area) = ac_popup {
@@ -431,14 +662,15 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
         }
     }
 
-    // Prominent balance bar.
+    // Balance bar
     let bar_style = if form.balance_ok {
         Style::default().bg(t.positive).fg(t.bg).add_modifier(Modifier::BOLD)
     } else {
         Style::default().bg(t.negative).fg(t.bg).add_modifier(Modifier::BOLD)
     };
+    let check = if form.balance_ok { "✓ " } else { "✗ " };
     f.render_widget(
-        Paragraph::new(format!("  {}", form.balance_note)).style(bar_style),
+        Paragraph::new(format!("  {check}{}", form.balance_note)).style(bar_style),
         rows[4],
     );
 
@@ -453,24 +685,20 @@ fn draw_form(f: &mut Frame, area: Rect, form: &mut FormState, t: &Theme) {
     let hints = Line::from(vec![
         Span::raw("  "),
         t.key("Ctrl+S"),
-        Span::raw(" "),
+        Span::styled(": ", Style::default().fg(t.subtle)),
         t.desc("save"),
         Span::raw("   "),
         t.key("Esc"),
-        Span::raw(" "),
+        Span::styled(": ", Style::default().fg(t.subtle)),
         t.desc("cancel"),
         Span::raw("   "),
         t.key("Tab"),
-        Span::raw(" "),
+        Span::styled(": ", Style::default().fg(t.subtle)),
         t.desc("next"),
         Span::raw("   "),
-        t.key("Ctrl+N"),
-        Span::raw(" "),
-        t.desc("posting"),
-        Span::raw("   "),
-        t.key("Ctrl+D"),
-        Span::raw(" "),
-        t.desc("delete"),
+        t.key("Ctrl+N/D"),
+        Span::styled(": ", Style::default().fg(t.subtle)),
+        t.desc("add/remove posting"),
     ]);
     f.render_widget(Paragraph::new(hints).style(t.base()), rows[6]);
 }
@@ -483,15 +711,16 @@ fn draw_autocomplete(f: &mut Frame, acc_area: Rect, form: &FormState, t: &Theme)
         width: acc_area.width,
         height: n + 2,
     };
-
     f.render_widget(Clear, popup);
+
     let items: Vec<ListItem> = form
         .completions
         .iter()
         .enumerate()
         .map(|(i, s)| {
             let style = if i == form.completion_sel {
-                t.selection()
+                // Highlighted completion: asset_amt bg (teal, matching image)
+                Style::default().bg(t.selection_bg).fg(t.asset_amt).add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(t.text)
             };
@@ -502,7 +731,6 @@ fn draw_autocomplete(f: &mut Frame, acc_area: Rect, form: &FormState, t: &Theme)
     f.render_widget(
         List::new(items).style(t.base()).block(
             Block::default()
-                .title(Span::styled(" accounts ", Style::default().fg(t.accent)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(t.border_focus)),
@@ -520,7 +748,7 @@ fn render_input(
     t: &Theme,
 ) {
     let (bstyle, tstyle) = if focused {
-        (t.border_focus, t.accent)
+        (t.border_focus, t.border_focus)
     } else {
         (t.border, t.subtle)
     };
@@ -537,18 +765,13 @@ fn render_input(
         let text = &input.text;
         let cur = input.cursor.min(text.len());
         let before = &text[..cur];
-        let at: String = text[cur..]
-            .chars()
-            .next()
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| " ".into());
+        let at: String = text[cur..].chars().next().map(|c| c.to_string()).unwrap_or_else(|| " ".into());
         let after_start = cur + at.len();
         let after = if after_start <= text.len() { &text[after_start..] } else { "" };
-
         f.render_widget(
             Paragraph::new(Line::from(vec![
                 Span::styled(before.to_string(), Style::default().fg(t.text)),
-                Span::styled(at, Style::default().bg(t.accent).fg(t.bg)),
+                Span::styled(at, Style::default().bg(t.border_focus).fg(t.bg)),
                 Span::styled(after.to_string(), Style::default().fg(t.text)),
             ]))
             .style(t.base()),
@@ -563,33 +786,63 @@ fn render_input(
     }
 }
 
+fn render_input_placeholder(f: &mut Frame, area: Rect, placeholder: &str, t: &Theme) {
+    let block = Block::default()
+        .title(Span::styled(" Amount ", Style::default().fg(t.subtle)))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(t.border))
+        .style(t.base());
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    f.render_widget(
+        Paragraph::new(Span::styled(placeholder, Style::default().fg(t.subtle).add_modifier(Modifier::ITALIC)))
+            .style(t.base()),
+        inner,
+    );
+}
+
+// ── Help overlay ──────────────────────────────────────────────────────────────
+
 fn draw_help(f: &mut Frame, area: Rect, t: &Theme) {
-    let head = |s: &str| Line::from(Span::styled(s.to_string(), Style::default().fg(t.accent).add_modifier(Modifier::BOLD)));
+    let head = |s: &str| {
+        Line::from(Span::styled(
+            s.to_string(),
+            Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+        ))
+    };
     let row = |k: &str, d: &str| {
         Line::from(vec![
             Span::raw("  "),
-            Span::styled(format!("{k:<12}"), Style::default().fg(t.running).add_modifier(Modifier::BOLD)),
-            Span::styled(d.to_string(), Style::default().fg(t.text)),
+            Span::styled(
+                format!("{k:<16}"),
+                Style::default().fg(t.text).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(d.to_string(), Style::default().fg(t.subtle)),
         ])
     };
 
     let lines = vec![
         Line::from(""),
         head("  Navigation"),
-        row("j / k", "scroll down / up"),
+        row("j / k", "move down / up"),
         row("g / G", "top / bottom"),
-        row("PgUp/PgDn", "page up / down"),
-        row("Ctrl+U/D", "half-page up / down"),
-        row("mouse", "wheel scroll · click to select"),
+        row("PgUp / PgDn", "page up / down"),
+        row("Ctrl+U / D", "half-page up / down"),
+        row("mouse wheel", "scroll  ·  click to select"),
         Line::from(""),
         head("  Views"),
-        row("1/b 2/r 3/a", "Balances / Register / Accounts"),
+        row("1 / d", "Dashboard"),
+        row("2 / b", "Balances"),
+        row("3 / r", "Register"),
+        row("4 / a", "Accounts"),
         row("Tab", "cycle views"),
         Line::from(""),
         head("  Actions"),
         row("/", "filter (shows match count)"),
         row("Enter", "drill into register"),
         row("u / Esc", "go back"),
+        row("h / l", "collapse / expand (Balances)"),
         row("Space / o", "toggle collapse"),
         row("[ / ]", "collapse all / expand all"),
         row("n", "new transaction"),
@@ -597,8 +850,8 @@ fn draw_help(f: &mut Frame, area: Rect, t: &Theme) {
         Line::from(""),
         head("  Entry form"),
         row("Ctrl+S", "save"),
-        row("Tab/Shift+Tab", "next / prev field"),
-        row("Ctrl+N/Ctrl+D", "add / delete posting"),
+        row("Tab / Shift+Tab", "next / prev field"),
+        row("Ctrl+N / D", "add / remove posting"),
         row("Space", "cycle status"),
         Line::from(""),
         row("q", "quit"),
@@ -606,20 +859,53 @@ fn draw_help(f: &mut Frame, area: Rect, t: &Theme) {
         Line::from(Span::styled("  press any key to close", Style::default().fg(t.subtle))),
     ];
 
-    let w = 56u16;
+    let w = 62u16;
     let h = (lines.len() + 2) as u16;
     let popup = centered_rect(w, h, area);
     f.render_widget(Clear, popup);
     f.render_widget(
         Paragraph::new(lines).style(t.base()).block(
             Block::default()
-                .title(Span::styled(" Help ", Style::default().fg(t.accent).add_modifier(Modifier::BOLD)))
+                .title(Span::styled(
+                    " Help ",
+                    Style::default().fg(t.accent).add_modifier(Modifier::BOLD),
+                ))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(t.border_focus)),
         ),
         popup,
     );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Format an amount with an explicit "+" prefix for positive values.
+fn format_signed_amount(a: &tally_core::model::Amount) -> String {
+    let s = format_amount(a);
+    if a.quantity > Decimal::ZERO {
+        format!("+{s}")
+    } else {
+        s
+    }
+}
+
+fn format_dollars(cents: i64) -> String {
+    let neg = cents < 0;
+    let abs_cents = cents.unsigned_abs();
+    let dollars = abs_cents / 100;
+    let sign = if neg { "-" } else { "" };
+    let s = dollars.to_string();
+    let with_commas: String = s
+        .chars()
+        .rev()
+        .enumerate()
+        .flat_map(|(i, c)| if i > 0 && i % 3 == 0 { vec![',', c] } else { vec![c] })
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    format!("{sign}${with_commas}")
 }
 
 fn draw_empty(f: &mut Frame, area: Rect, t: &Theme, msg: String) {
@@ -639,7 +925,7 @@ fn empty_msg(app: &App) -> String {
     if app.filter.is_empty() {
         "Nothing to show".to_string()
     } else {
-        "No matches — press Esc to clear the filter".to_string()
+        "No matches — press Esc to clear".to_string()
     }
 }
 
@@ -666,9 +952,19 @@ fn highlight(text: &str, filter: &str, t: &Theme) -> Vec<Span<'static>> {
     vec![plain(text)]
 }
 
+/// Shrink rect by `pad` columns on each side (no vertical change).
+fn h_padded(area: Rect, pad: u16) -> Rect {
+    Rect {
+        x: area.x + pad,
+        y: area.y,
+        width: area.width.saturating_sub(pad * 2),
+        height: area.height,
+    }
+}
+
 fn form_rect(area: Rect) -> Rect {
     let w = area.width.min(82);
-    let h = area.height.min(34);
+    let h = area.height.min(36);
     centered_rect(w, h, area)
 }
 

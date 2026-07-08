@@ -1,0 +1,17 @@
+{
+  "name": "tally-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.0.0",
+    "@astrojs/starlight": "^0.32.0",
+    "astro": "^5.0.0"
+  }
+}

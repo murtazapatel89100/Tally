@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a new feature or improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please check the [ROADMAP](https://github.com/murtazapatel89100/Tally/blob/main/ROADMAP.md)
+        first — your idea may already be planned. For large features, this issue is
+        the right place to discuss the design before any code is written.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case or pain point. What are you trying to do that Tally can't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like Tally to do? Include example commands, config, or journal syntax if relevant.
+      placeholder: |
+        Add `tally reg --csv` to output the register as CSV so I can pipe it into a spreadsheet.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you currently use, or other approaches you thought about.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Tally would this affect?
+      options:
+        - Core / parser (tally-core)
+        - CLI
+        - TUI
+        - Config (tally.toml)
+        - Docs / website
+        - Packaging / releases
+        - Other / not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: roadmap
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the ROADMAP and existing issues, and this isn't already tracked.
+          required: true

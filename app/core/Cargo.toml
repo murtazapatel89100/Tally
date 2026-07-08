@@ -1,8 +1,15 @@
 [package]
 name = "tally-core"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
 description = "Pure domain logic for Tally — no TUI dependencies"
+keywords = ["accounting", "ledger", "finance", "plain-text"]
+categories = ["finance", "parser-implementations"]
 
 [dependencies]
 rust_decimal = "1"
@@ -16,6 +23,12 @@ miette = { version = "7.6.0", features = ["fancy"] }
 [dev-dependencies]
 insta = "1"
 rust_decimal_macros = "1"
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "large_journal"
+harness = false
 
 [lints]
 workspace = true

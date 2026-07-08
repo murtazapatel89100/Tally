@@ -2,22 +2,236 @@
 source: core/tests/reports_snapshot.rs
 expression: rep.render()
 ---
-2026-01-01 Opening Balances         Assets:Checking                $5,000.00     $5,000.00
-2026-01-01 Opening Balances         Assets:Savings                 $2,500.00     $7,500.00
-2026-01-01 Opening Balances         Equity:Opening Balances       -$7,500.00         $0.00
-2026-01-05 Grocery Store            Expenses:Food:Groceries          $123.45       $123.45
-2026-01-05 Grocery Store            Assets:Checking                 -$123.45         $0.00
-2026-01-10 Electric Bill            Expenses:Utilities:Elec...        $87.50        $87.50
-2026-01-10 Electric Bill            Liabilities:CreditCard           -$87.50         $0.00
-2026-01-15 Employer                 Assets:Checking                $3,500.00     $3,500.00
-2026-01-15 Employer                 Income:Salary                 -$3,500.00         $0.00
-2026-01-20 Blue Bottle Coffee       Expenses:Food:Coffee               $4.75         $4.75
-2026-01-20 Blue Bottle Coffee       Assets:Checking                   -$4.75         $0.00
-2026-01-28 Credit Card Payment      Liabilities:CreditCard            $87.50        $87.50
-2026-01-28 Credit Card Payment      Assets:Checking                  -$87.50         $0.00
-2026-02-01 Grocery Store            Expenses:Food:Groceries           $98.32        $98.32
-2026-02-01 Grocery Store            Assets:Checking                  -$98.32         $0.00
-2026-02-15 Employer                 Assets:Checking                $3,500.00     $3,500.00
-2026-02-15 Employer                 Income:Salary                 -$3,500.00         $0.00
-2026-02-18 Transfer to Savings      Assets:Savings                   $500.00       $500.00
-2026-02-18 Transfer to Savings      Assets:Checking                 -$500.00         $0.00
+2026-01-01 Opening Balances         Assets:Checking                $3,200.00     $3,200.00
+2026-01-01 Opening Balances         Assets:Savings                 $8,500.00    $11,700.00
+2026-01-01 Opening Balances         Assets:Investments:ETF        $12,400.00    $24,100.00
+2026-01-01 Opening Balances         Assets:Investments:Crypto      $1,800.00    $25,900.00
+2026-01-01 Opening Balances         Liabilities:CreditCard          -$420.00    $25,480.00
+2026-01-01 Opening Balances         Liabilities:StudentLoan      -$14,200.00    $11,280.00
+2026-01-01 Opening Balances         Equity:Opening Balances      -$11,280.00         $0.00
+2026-01-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-01-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-01-03 Whole Foods Market       Expenses:Food:Groceries          $134.52       $134.52
+2026-01-03 Whole Foods Market       Liabilities:CreditCard          -$134.52         $0.00
+2026-01-06 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-01-06 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-01-07 Pacific Gas & Electric   Expenses:Utilities:Elec...        $94.00        $94.00
+2026-01-07 Pacific Gas & Electric   Liabilities:CreditCard           -$94.00         $0.00
+2026-01-09 Chipotle                 Expenses:Food:Dining              $18.75        $18.75
+2026-01-09 Chipotle                 Assets:Checking                  -$18.75         $0.00
+2026-01-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-01-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-01-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-01-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-01-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-01-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-01-17 Whole Foods Market       Expenses:Food:Groceries          $112.30       $112.30
+2026-01-17 Whole Foods Market       Liabilities:CreditCard          -$112.30         $0.00
+2026-01-20 CVS Pharmacy             Expenses:Health:Pharmacy          $32.40        $32.40
+2026-01-20 CVS Pharmacy             Assets:Checking                  -$32.40         $0.00
+2026-01-22 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-01-22 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-01-24 Shell Gas Station        Expenses:Transport:Gas            $62.00        $62.00
+2026-01-24 Shell Gas Station        Assets:Checking                  -$62.00         $0.00
+2026-01-25 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-01-25 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-01-27 Ramen House              Expenses:Food:Dining              $42.00        $42.00
+2026-01-27 Ramen House              Assets:Checking                  -$42.00         $0.00
+2026-01-28 Credit Card Payment      Liabilities:CreditCard           $700.00       $700.00
+2026-01-28 Credit Card Payment      Assets:Checking                 -$700.00         $0.00
+2026-01-29 Transfer to Savings      Assets:Savings                   $500.00       $500.00
+2026-01-29 Transfer to Savings      Assets:Checking                 -$500.00         $0.00
+2026-01-30 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-01-30 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-02-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-02-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-02-01 Whole Foods Market       Expenses:Food:Groceries          $128.90       $128.90
+2026-02-01 Whole Foods Market       Liabilities:CreditCard          -$128.90         $0.00
+2026-02-03 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-02-03 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-02-06 Pacific Gas & Electric   Expenses:Utilities:Elec...        $88.00        $88.00
+2026-02-06 Pacific Gas & Electric   Liabilities:CreditCard           -$88.00         $0.00
+2026-02-07 Freelance — Web Design   Assets:Checking                  $900.00       $900.00
+2026-02-07 Freelance — Web Design   Income:Freelance                -$900.00         $0.00
+2026-02-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-02-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-02-11 AMC Theatres             Expenses:Entertainment:...        $32.00        $32.00
+2026-02-11 AMC Theatres             Assets:Checking                  -$32.00         $0.00
+2026-02-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-02-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-02-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-02-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-02-16 Whole Foods Market       Expenses:Food:Groceries           $98.15        $98.15
+2026-02-16 Whole Foods Market       Liabilities:CreditCard           -$98.15         $0.00
+2026-02-18 Chipotle                 Expenses:Food:Dining              $21.50        $21.50
+2026-02-18 Chipotle                 Assets:Checking                  -$21.50         $0.00
+2026-02-20 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-02-20 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-02-22 Shell Gas Station        Expenses:Transport:Gas            $58.00        $58.00
+2026-02-22 Shell Gas Station        Assets:Checking                  -$58.00         $0.00
+2026-02-24 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-02-24 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-02-26 Credit Card Payment      Liabilities:CreditCard           $650.00       $650.00
+2026-02-26 Credit Card Payment      Assets:Checking                 -$650.00         $0.00
+2026-02-27 Transfer to Savings      Assets:Savings                   $600.00       $600.00
+2026-02-27 Transfer to Savings      Assets:Checking                 -$600.00         $0.00
+2026-02-28 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-02-28 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-03-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-03-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-03-01 Whole Foods Market       Expenses:Food:Groceries          $143.70       $143.70
+2026-03-01 Whole Foods Market       Liabilities:CreditCard          -$143.70         $0.00
+2026-03-05 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-03-05 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-03-06 Pacific Gas & Electric   Expenses:Utilities:Elec...        $76.00        $76.00
+2026-03-06 Pacific Gas & Electric   Liabilities:CreditCard           -$76.00         $0.00
+2026-03-08 Sushi Place              Expenses:Food:Dining              $68.00        $68.00
+2026-03-08 Sushi Place              Assets:Checking                  -$68.00         $0.00
+2026-03-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-03-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-03-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-03-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-03-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-03-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-03-17 Whole Foods Market       Expenses:Food:Groceries          $119.45       $119.45
+2026-03-17 Whole Foods Market       Liabilities:CreditCard          -$119.45         $0.00
+2026-03-19 Freelance — Logo De...   Assets:Checking                  $450.00       $450.00
+2026-03-19 Freelance — Logo De...   Income:Freelance                -$450.00         $0.00
+2026-03-20 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-03-20 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-03-22 Shell Gas Station        Expenses:Transport:Gas            $55.00        $55.00
+2026-03-22 Shell Gas Station        Assets:Checking                  -$55.00         $0.00
+2026-03-24 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-03-24 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-03-25 CVS Pharmacy             Expenses:Health:Pharmacy          $18.90        $18.90
+2026-03-25 CVS Pharmacy             Assets:Checking                  -$18.90         $0.00
+2026-03-26 AMC Theatres             Expenses:Entertainment:...        $28.00        $28.00
+2026-03-26 AMC Theatres             Assets:Checking                  -$28.00         $0.00
+2026-03-28 Credit Card Payment      Liabilities:CreditCard           $620.00       $620.00
+2026-03-28 Credit Card Payment      Assets:Checking                 -$620.00         $0.00
+2026-03-29 Transfer to Investments  Assets:Investments:ETF           $300.00       $300.00
+2026-03-29 Transfer to Investments  Assets:Checking                 -$300.00         $0.00
+2026-03-31 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-03-31 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-04-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-04-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-04-01 Whole Foods Market       Expenses:Food:Groceries          $156.20       $156.20
+2026-04-01 Whole Foods Market       Liabilities:CreditCard          -$156.20         $0.00
+2026-04-04 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-04-04 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-04-06 Pacific Gas & Electric   Expenses:Utilities:Elec...        $68.00        $68.00
+2026-04-06 Pacific Gas & Electric   Liabilities:CreditCard           -$68.00         $0.00
+2026-04-07 Freelance — Content...   Assets:Checking                  $650.00       $650.00
+2026-04-07 Freelance — Content...   Income:Freelance                -$650.00         $0.00
+2026-04-09 Chipotle                 Expenses:Food:Dining              $19.25        $19.25
+2026-04-09 Chipotle                 Assets:Checking                  -$19.25         $0.00
+2026-04-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-04-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-04-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-04-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-04-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-04-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-04-16 Trader Joe's             Expenses:Food:Groceries           $89.35        $89.35
+2026-04-16 Trader Joe's             Liabilities:CreditCard           -$89.35         $0.00
+2026-04-19 Italian Restaurant       Expenses:Food:Dining              $74.50        $74.50
+2026-04-19 Italian Restaurant       Assets:Checking                  -$74.50         $0.00
+2026-04-20 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-04-20 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-04-22 Shell Gas Station        Expenses:Transport:Gas            $60.00        $60.00
+2026-04-22 Shell Gas Station        Assets:Checking                  -$60.00         $0.00
+2026-04-24 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-04-24 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-04-28 Credit Card Payment      Liabilities:CreditCard           $580.00       $580.00
+2026-04-28 Credit Card Payment      Assets:Checking                 -$580.00         $0.00
+2026-04-29 Transfer to Savings      Assets:Savings                   $400.00       $400.00
+2026-04-29 Transfer to Savings      Assets:Checking                 -$400.00         $0.00
+2026-04-30 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-04-30 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-05-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-05-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-05-02 Whole Foods Market       Expenses:Food:Groceries          $138.80       $138.80
+2026-05-02 Whole Foods Market       Liabilities:CreditCard          -$138.80         $0.00
+2026-05-05 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-05-05 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-05-06 Pacific Gas & Electric   Expenses:Utilities:Elec...        $62.00        $62.00
+2026-05-06 Pacific Gas & Electric   Liabilities:CreditCard           -$62.00         $0.00
+2026-05-08 Thai Restaurant          Expenses:Food:Dining              $38.00        $38.00
+2026-05-08 Thai Restaurant          Assets:Checking                  -$38.00         $0.00
+2026-05-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-05-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-05-11 AMC Theatres             Expenses:Entertainment:...        $36.00        $36.00
+2026-05-11 AMC Theatres             Assets:Checking                  -$36.00         $0.00
+2026-05-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-05-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-05-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-05-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-05-16 Whole Foods Market       Expenses:Food:Groceries          $104.60       $104.60
+2026-05-16 Whole Foods Market       Liabilities:CreditCard          -$104.60         $0.00
+2026-05-20 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-05-20 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-05-22 Shell Gas Station        Expenses:Transport:Gas            $57.00        $57.00
+2026-05-22 Shell Gas Station        Assets:Checking                  -$57.00         $0.00
+2026-05-24 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-05-24 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-05-26 CVS Pharmacy             Expenses:Health:Pharmacy          $24.75        $24.75
+2026-05-26 CVS Pharmacy             Assets:Checking                  -$24.75         $0.00
+2026-05-27 Freelance — UI Audit     Assets:Checking                $1,200.00     $1,200.00
+2026-05-27 Freelance — UI Audit     Income:Freelance              -$1,200.00         $0.00
+2026-05-28 Credit Card Payment      Liabilities:CreditCard           $540.00       $540.00
+2026-05-28 Credit Card Payment      Assets:Checking                 -$540.00         $0.00
+2026-05-29 Transfer to Investments  Assets:Investments:ETF           $400.00       $400.00
+2026-05-29 Transfer to Investments  Assets:Checking                 -$400.00         $0.00
+2026-05-31 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-05-31 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-06-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-06-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-06-02 Whole Foods Market       Expenses:Food:Groceries          $147.30       $147.30
+2026-06-02 Whole Foods Market       Liabilities:CreditCard          -$147.30         $0.00
+2026-06-05 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-06-05 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-06-06 Pacific Gas & Electric   Expenses:Utilities:Elec...        $58.00        $58.00
+2026-06-06 Pacific Gas & Electric   Liabilities:CreditCard           -$58.00         $0.00
+2026-06-09 Sushi Place              Expenses:Food:Dining              $82.00        $82.00
+2026-06-09 Sushi Place              Assets:Checking                  -$82.00         $0.00
+2026-06-10 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-06-10 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-06-12 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-06-12 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-06-14 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-06-14 Planet Fitness           Assets:Checking                  -$25.00         $0.00
+2026-06-17 Trader Joe's             Expenses:Food:Groceries          $111.45       $111.45
+2026-06-17 Trader Joe's             Liabilities:CreditCard          -$111.45         $0.00
+2026-06-19 Freelance — React D...   Assets:Checking                $1,800.00     $1,800.00
+2026-06-19 Freelance — React D...   Income:Freelance              -$1,800.00         $0.00
+2026-06-20 Landlord                 Expenses:Housing:Rent          $1,850.00     $1,850.00
+2026-06-20 Landlord                 Assets:Checking               -$1,850.00         $0.00
+2026-06-22 Shell Gas Station        Expenses:Transport:Gas            $63.00        $63.00
+2026-06-22 Shell Gas Station        Assets:Checking                  -$63.00         $0.00
+2026-06-24 Comcast                  Expenses:Utilities:Inte...        $79.99        $79.99
+2026-06-24 Comcast                  Liabilities:CreditCard           -$79.99         $0.00
+2026-06-25 AMC Theatres             Expenses:Entertainment:...        $22.00        $22.00
+2026-06-25 AMC Theatres             Assets:Checking                  -$22.00         $0.00
+2026-06-26 CVS Pharmacy             Expenses:Health:Pharmacy          $41.20        $41.20
+2026-06-26 CVS Pharmacy             Assets:Checking                  -$41.20         $0.00
+2026-06-28 Credit Card Payment      Liabilities:CreditCard           $560.00       $560.00
+2026-06-28 Credit Card Payment      Assets:Checking                 -$560.00         $0.00
+2026-06-29 Transfer to Savings      Assets:Savings                   $500.00       $500.00
+2026-06-29 Transfer to Savings      Assets:Checking                 -$500.00         $0.00
+2026-06-30 Student Loan Payment     Liabilities:StudentLoan          $250.00       $250.00
+2026-06-30 Student Loan Payment     Assets:Checking                 -$250.00         $0.00
+2026-07-15 Employer                 Assets:Checking                $4,200.00     $4,200.00
+2026-07-15 Employer                 Income:Salary                 -$4,200.00         $0.00
+2026-07-01 Whole Foods Market       Expenses:Food:Groceries          $162.40       $162.40
+2026-07-01 Whole Foods Market       Liabilities:CreditCard          -$162.40         $0.00
+2026-07-03 Blue Bottle Coffee       Expenses:Food:Coffee               $6.50         $6.50
+2026-07-03 Blue Bottle Coffee       Assets:Checking                   -$6.50         $0.00
+2026-07-04 Pacific Gas & Electric   Expenses:Utilities:Elec...        $71.00        $71.00
+2026-07-04 Pacific Gas & Electric   Liabilities:CreditCard           -$71.00         $0.00
+2026-07-05 Chipotle                 Expenses:Food:Dining              $22.50        $22.50
+2026-07-05 Chipotle                 Assets:Checking                  -$22.50         $0.00
+2026-07-06 Spotify + Netflix        Expenses:Entertainment:...        $28.97        $28.97
+2026-07-06 Spotify + Netflix        Liabilities:CreditCard           -$28.97         $0.00
+2026-07-08 Bay Area Rapid Transit   Expenses:Transport:Publ...        $45.00        $45.00
+2026-07-08 Bay Area Rapid Transit   Assets:Checking                  -$45.00         $0.00
+2026-07-10 Planet Fitness           Expenses:Health:Gym               $25.00        $25.00
+2026-07-10 Planet Fitness           Assets:Checking                  -$25.00         $0.00

@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Tally pre-commit hook — blocks the commit if lint fails, so nothing
+# broken gets committed (and therefore nothing broken gets pushed).
+#
+# Enable it once per clone with:
+#
+#     git config core.hooksPath .githooks
+#
+# Runs the same clippy gate as CI (warnings treated as errors).
+# Skip in an emergency with:  git commit --no-verify
+
+set -e
+
+echo "pre-commit: running clippy lint (warnings = errors)…"
+
+RUSTFLAGS="-D warnings" cargo clippy \
+    --manifest-path app/Cargo.toml \
+    --all-targets --all-features \
+    -- -D warnings
+
+echo "pre-commit: lint clean ✔"

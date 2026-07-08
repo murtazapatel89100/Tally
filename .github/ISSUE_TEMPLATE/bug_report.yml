@@ -1,0 +1,84 @@
+name: Bug report
+description: Report something that isn't working as expected
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill in as much as you can —
+        a minimal journal snippet that reproduces the problem is the single most
+        helpful thing you can provide.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+      placeholder: |
+        When I run `tally bal`, the total for Assets is off by $10.
+        I expected it to match `hledger bal`.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands and (ideally) a minimal `.journal` snippet that triggers it.
+      placeholder: |
+        1. Save this journal as repro.journal:
+
+           2026-01-01 * Opening
+               Assets:Checking   $100.00
+               Equity:Opening
+
+        2. Run: tally -f repro.journal bal
+        3. Observe: ...
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual
+      description: What you expected to see and what actually happened.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tally version
+      description: Output of `tally --version`.
+      placeholder: "tally 0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other (note in description)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Tally?
+      options:
+        - CLI (bal / reg / print / …)
+        - TUI (interactive interface)
+        - Parser (reading journal files)
+        - Config (tally.toml)
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal & theme (for TUI bugs)
+      description: e.g. "kitty, theme = nord" — leave blank if not a TUI issue.
+      placeholder: "Alacritty, theme = dark"
+    validations:
+      required: false

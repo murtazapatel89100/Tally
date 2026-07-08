@@ -1,0 +1,27 @@
+file = "examples/sample.journal"
+theme = "dark"
+
+[[budgets]]
+account = "Expenses:Food"
+monthly = 600.00
+label = "Food"
+
+[[budgets]]
+account = "Expenses:Housing"
+monthly = 1850.00
+label = "Rent"
+
+[[budgets]]
+account = "Expenses:Transport"
+monthly = 200.00
+label = "Transport"
+
+[[budgets]]
+account = "Expenses:Entertainment"
+monthly = 150.00
+label = "Entertainment"
+
+[[budgets]]
+account = "Expenses:Health"
+monthly = 100.00
+label = "Health"

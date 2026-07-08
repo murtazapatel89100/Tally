@@ -1,8 +1,15 @@
 [package]
 name = "tally"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
 description = "Tally — plain-text, double-entry accounting for the terminal"
+keywords = ["accounting", "ledger", "tui", "finance", "cli"]
+categories = ["command-line-utilities", "finance"]
 
 [[bin]]
 name = "tally"
@@ -21,6 +28,9 @@ crossterm = "0.29"
 rust_decimal = "1"
 nucleo-matcher = "0.3"
 jiff = "0.2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+directories = "5"
 
 [dev-dependencies]
 insta = "1"
